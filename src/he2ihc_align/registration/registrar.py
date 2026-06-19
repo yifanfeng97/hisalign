@@ -73,7 +73,7 @@ class HEIHCRegistrar:
         Maximum image dimension for non-rigid registration.
     rigid_registrars : dict[str, rigid.RigidRegistrar]
         Rigid registrars for each IHC slide.
-    non_rigid_registrars : dict[str, non_rigid.NonRigidRegistrar]
+    non_rigid_registrars : dict[str, non_rigid.NonRigidRegistrarBase]
         Non-rigid registrars for each IHC slide.
     """
 
@@ -92,7 +92,7 @@ class HEIHCRegistrar:
         self.max_non_rigid_dim_px = max_non_rigid_dim_px
 
         self.rigid_registrars: dict[str, rigid.RigidRegistrar] = {}
-        self.non_rigid_registrars: dict[str, non_rigid.NonRigidRegistrar] = {}
+        self.non_rigid_registrars: dict[str, non_rigid.NonRigidRegistrarBase] = {}
 
         # Read HE image at registration level
         self.he_img = _read_slide_at_level(he_slide, registration_level, max_dim_px=max_image_dim_px)

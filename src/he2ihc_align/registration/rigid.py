@@ -93,13 +93,12 @@ class RigidRegistrar:
 
         # Estimate transform
         if transform_type == "euclidean":
-            tform = EuclideanTransform()
+            tform = EuclideanTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
         elif transform_type == "similarity":
-            tform = SimilarityTransform()
+            tform = SimilarityTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
         else:
-            tform = AffineTransform()
+            tform = AffineTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
 
-        tform = SimilarityTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
         self.M = tform.params
 
         # Ensure homogeneous

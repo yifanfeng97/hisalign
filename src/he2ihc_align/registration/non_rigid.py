@@ -15,7 +15,7 @@ from tqdm import tqdm
 from . import warp_tools
 
 
-class NonRigidRegistrar:
+class NonRigidRegistrarBase:
     """Abstract base class for non-rigid registration using displacement fields.
 
     Warps moving_img to align with fixed_img using backwards transformations.
@@ -115,7 +115,7 @@ class NonRigidRegistrar:
         return grid_img
 
 
-class OpticalFlowWarper(NonRigidRegistrar):
+class OpticalFlowWarper(NonRigidRegistrarBase):
     """Use dense optical flow to register images.
 
     Uses OpenCV's DeepFlow or Farneback optical flow.
@@ -191,7 +191,7 @@ class OpticalFlowWarper(NonRigidRegistrar):
         return bk_dxdy
 
 
-class NonRigidRegistrarXY(NonRigidRegistrar):
+class NonRigidRegistrarXY(NonRigidRegistrarBase):
     """Non-rigid registration that can use corresponding points."""
 
     def __init__(self, params=None):
@@ -206,7 +206,7 @@ class NonRigidRegistrarXY(NonRigidRegistrar):
 
         self.moving_xy = moving_xy
         self.fixed_xy = fixed_xy
-        return NonRigidRegistrar.register(self, moving_img=moving_img, fixed_img=fixed_img, mask=mask, **kwargs)
+        return NonRigidRegistrarBase.register(self, moving_img=moving_img, fixed_img=fixed_img, mask=mask, **kwargs)
 
     def filter_xy(self, moving_xy, fixed_xy, img_shape_rc, mask=None):
         """Remove points outside image and/or mask."""
@@ -229,6 +229,11 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
         self.ammi_weight = ammi_weight
         self.bending_penalty_weight = bending_penalty_weight
         self.kp_weight = kp_weight
+        if params is not None:
+            self._params_provided = True
+            self.params = params
+        else:
+            self._params_provided = False
 
     @staticmethod
     def get_default_params(img_shape, grid_spacing_ratio=0.025):
