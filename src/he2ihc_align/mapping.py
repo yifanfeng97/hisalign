@@ -37,9 +37,14 @@ def build_mapping_table(
     slide_id : str
         Identifier for the slide/case.
     he_level : int, default 0
-        Pyramid level of the HE bboxes (unused since bboxes are level-0).
+        Pyramid level of the HE bboxes. Reserved for future use; must be 0.
     ihc_level : int, default 0
-        Pyramid level of the IHC bboxes (unused since output is level-0).
+        Pyramid level of the IHC bboxes. Reserved for future use; must be 0.
+
+    Raises
+    ------
+    ValueError
+        If ``he_level`` or ``ihc_level`` is non-zero.
 
     Returns
     -------
@@ -48,21 +53,15 @@ def build_mapping_table(
         patch_id, slide_id, marker, he_x, he_y, he_w, he_h,
         ihc_x, ihc_y, ihc_w, ihc_h, clipped.
     """
+    if he_level != 0 or ihc_level != 0:
+        raise ValueError("he_level and ihc_level must be 0 (reserved for future use)")
+
     rows: list[dict] = []
 
     for patch_idx, (he_x, he_y, he_w, he_h) in enumerate(he_patch_bboxes):
         patch_id = f"{slide_id}_{patch_idx:04d}"
 
-        # Four corners of the HE patch
-        corners = np.array(
-            [
-                [he_x, he_y],
-                [he_x + he_w, he_y],
-                [he_x + he_w, he_y + he_h],
-                [he_x, he_y + he_h],
-            ],
-            dtype=np.float64,
-        )
+        corners = _bbox_to_corners(he_x, he_y, he_w, he_h)
 
         for marker, ihc_slide in ihc_slides.items():
             # Warp corners from HE to IHC
@@ -79,10 +78,12 @@ def build_mapping_table(
             ihc_w = ihc_x_max - ihc_x_min
             ihc_h = ihc_y_max - ihc_y_min
 
-            # Check if bbox exceeds IHC slide bounds
+            # Check if bbox exceeds IHC slide bounds or is degenerate
             ihc_w_total, ihc_h_total = ihc_slide.level_dimensions[ihc_level]
             clipped = (
-                ihc_x < 0
+                ihc_w <= 0
+                or ihc_h <= 0
+                or ihc_x < 0
                 or ihc_y < 0
                 or ihc_x + ihc_w > ihc_w_total
                 or ihc_y + ihc_h > ihc_h_total
@@ -106,3 +107,16 @@ def build_mapping_table(
             )
 
     return pd.DataFrame(rows)
+
+
+def _bbox_to_corners(x: int, y: int, w: int, h: int) -> np.ndarray:
+    """Return the four corners of a bounding box as a (4, 2) float array."""
+    return np.array(
+        [
+            [x, y],
+            [x + w, y],
+            [x + w, y + h],
+            [x, y + h],
+        ],
+        dtype=np.float64,
+    )

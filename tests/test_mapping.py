@@ -177,7 +177,7 @@ class TestBuildMappingTable:
             slide_id="test_slide",
         )
         # At least some rows should be clipped for edge patches
-        assert df["clipped"].any() or not df["clipped"].any()  # just check it's valid bool
+        assert df["clipped"].any(), "Expected at least one clipped row for edge patch"
 
     def test_slide_id_in_all_rows(self, registrar, he_slide, ihc_slides):
         he_patch_bboxes = [(0, 0, 512, 512)]

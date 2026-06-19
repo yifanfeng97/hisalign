@@ -35,12 +35,14 @@ class TestSampleGridPatches:
         def _read_region(location, level, size):
             x, y = location
             w, h = size
-            # Create a white patch in the top-left half, dark in bottom-right
+            # Create a white region in the top-left 512x512 of the slide, dark elsewhere
             arr = np.zeros((h, w, 3), dtype=np.uint8)
-            if x < 512 and y < 512:
-                arr[:] = 255  # white
-            else:
-                arr[:] = 50  # dark
+            for i in range(h):
+                for j in range(w):
+                    if x + j < 512 and y + i < 512:
+                        arr[i, j] = 255  # white
+                    else:
+                        arr[i, j] = 50  # dark
             return arr
 
         slide.read_region = _read_region

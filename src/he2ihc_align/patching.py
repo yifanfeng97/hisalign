@@ -55,24 +55,49 @@ def sample_grid_patches(
 
     bboxes: list[tuple[int, int, int, int]] = []
 
+    # Build list of all patch positions before reading
+    patch_positions: list[tuple[int, int, int, int]] = []
     for y_level in range(margin_level, margin_level + effective_h, stride):
         for x_level in range(margin_level, margin_level + effective_w, stride):
-            # Clamp patch to effective bounds at this level
             pw = min(patch_size, margin_level + effective_w - x_level)
             ph = min(patch_size, margin_level + effective_h - y_level)
             if pw <= 0 or ph <= 0:
                 continue
-
-            # Convert location to level-0 coordinates for read_region
             x0 = int(x_level * downsample)
             y0 = int(y_level * downsample)
             w0 = int(pw * downsample)
             h0 = int(ph * downsample)
+            patch_positions.append((x_level, y_level, pw, ph, x0, y0, w0, h0))
 
-            # Read patch at the specified level (location is level-0, size is at level)
-            patch = slide.read_region((x0, y0), level, (pw, ph))
+    if not patch_positions:
+        return bboxes
 
-            # Convert to grayscale and count white pixels
+    # Determine tile size to batch read_region calls
+    tile_size = max(patch_size, stride) * 4
+
+    # Group patches by tile
+    tile_patches: dict[tuple[int, int], list[tuple[int, int, int, int, int, int, int, int]]] = {}
+    for x_level, y_level, pw, ph, x0, y0, w0, h0 in patch_positions:
+        tile_x = (x_level // tile_size) * tile_size
+        tile_y = (y_level // tile_size) * tile_size
+        tile_patches.setdefault((tile_x, tile_y), []).append((x_level, y_level, pw, ph, x0, y0, w0, h0))
+
+    for (tile_x, tile_y), patches in tile_patches.items():
+        # Compute tile bounds covering all patches in this tile
+        max_x = max(x_level + pw for x_level, _, pw, _, _, _, _, _ in patches)
+        max_y = max(y_level + ph for _, y_level, _, ph, _, _, _, _ in patches)
+        tile_w = max_x - tile_x
+        tile_h = max_y - tile_y
+
+        tile_x0 = int(tile_x * downsample)
+        tile_y0 = int(tile_y * downsample)
+        tile = slide.read_region((tile_x0, tile_y0), level, (tile_w, tile_h))
+
+        for x_level, y_level, pw, ph, x0, y0, w0, h0 in patches:
+            rel_x = x_level - tile_x
+            rel_y = y_level - tile_y
+            patch = tile[rel_y : rel_y + ph, rel_x : rel_x + pw]
+
             gray = np.mean(patch, axis=2) if patch.ndim == 3 else patch
             white_pixels = np.sum(gray > white_threshold)
             total_pixels = gray.size
