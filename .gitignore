@@ -1,16 +1,63 @@
-.worktrees/
-outputs/
+# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
-.venv/
-venv/
-dist/
+*$py.class
+*.so
+.Python
 build/
-.DS_Store
-*.csv
-*.tiff
-*.tif
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv
+venv/
+ENV/
+env/
+
+# IDEs
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ruff
+.ruff_cache/
+
+# Outputs
+outputs/
+
+# Data (symlinks or local copies)
+data/
+
+# Jupyter
+.ipynb_checkpoints/
+
+.worktrees/
+*.csv
+*.tiff
+*.tif

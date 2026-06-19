@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "he2ihc-align"
+version = "0.1.0"
+description = "HE-to-IHC whole-slide image alignment pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "he2ihc-align team" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "pillow",
+    "matplotlib",
+    "pyvips",
+    "opencv-python-headless",
+    "scikit-image",
+    "scipy",
+    "scikit-learn",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "pyyaml",
+    "openslide-python",
+    "openslide-bin",
+    "kfbslide",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.scripts]
+he2ihc-align = "he2ihc_align.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/he2ihc_align"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
