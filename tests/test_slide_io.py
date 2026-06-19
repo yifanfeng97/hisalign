@@ -78,6 +78,24 @@ class TestOpenSlideBackend:
         assert arr.shape == (128, 128, 3)
         assert arr.dtype == np.uint8
 
+    def test_read_region_level0_location_at_higher_level(self, openslide_backend):
+        """Verify that location is interpreted as level-0 coordinates."""
+        if openslide_backend.level_count <= 3:
+            pytest.skip("Need at least 4 levels")
+        level = 3
+        downsample = openslide_backend.level_downsamples[level]
+        # Pick a small patch at level-0 coordinates that is well within bounds
+        level0_w, level0_h = openslide_backend.level_dimensions[0]
+        x0 = min(1000, int(level0_w * 0.1))
+        y0 = min(1000, int(level0_h * 0.1))
+        size = (64, 64)
+        # Ensure the patch fits in level-0
+        assert x0 + size[0] * downsample <= level0_w
+        assert y0 + size[1] * downsample <= level0_h
+        arr = openslide_backend.read_region((x0, y0), level, size)
+        assert arr.shape == (64, 64, 3)
+        assert arr.dtype == np.uint8
+
     def test_read_region_invalid_level_raises(self, openslide_backend):
         with pytest.raises(SlideIOError):
             openslide_backend.read_region((0, 0), openslide_backend.level_count + 1, (128, 128))
@@ -122,6 +140,24 @@ class TestKfbSlideBackend:
             pytest.skip("Only one level available")
         arr = kfb_backend.read_region((0, 0), 1, (128, 128))
         assert arr.shape == (128, 128, 3)
+        assert arr.dtype == np.uint8
+
+    def test_read_region_level0_location_at_higher_level(self, kfb_backend):
+        """Verify that location is interpreted as level-0 coordinates."""
+        if kfb_backend.level_count <= 3:
+            pytest.skip("Need at least 4 levels")
+        level = 3
+        downsample = kfb_backend.level_downsamples[level]
+        # Pick a small patch at level-0 coordinates that is well within bounds
+        level0_w, level0_h = kfb_backend.level_dimensions[0]
+        x0 = min(1000, int(level0_w * 0.1))
+        y0 = min(1000, int(level0_h * 0.1))
+        size = (64, 64)
+        # Ensure the patch fits in level-0
+        assert x0 + size[0] * downsample <= level0_w
+        assert y0 + size[1] * downsample <= level0_h
+        arr = kfb_backend.read_region((x0, y0), level, size)
+        assert arr.shape == (64, 64, 3)
         assert arr.dtype == np.uint8
 
     def test_read_region_invalid_level_raises(self, kfb_backend):
