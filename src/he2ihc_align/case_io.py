@@ -43,6 +43,10 @@ def discover_case(case_dir: str | Path) -> tuple[Path, dict[str, Path]]:
                 if f.is_file() and f.suffix.lower() == ".svs":
                     # Marker name is the last space-separated token of the stem
                     marker_name = f.stem.split()[-1]
+                    if marker_name in markers:
+                        raise ValueError(
+                            f"Duplicate marker name '{marker_name}' from {f} and {markers[marker_name]}"
+                        )
                     markers[marker_name] = f
 
     return he_path, markers

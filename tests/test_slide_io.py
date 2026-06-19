@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from he2ihc_align.slide_io.base import Slide
+from he2ihc_align.slide_io.base import Slide, SlideIOError
 from he2ihc_align.slide_io.openslide_backend import OpenSlideBackend
 from he2ihc_align.slide_io.kfb_backend import KfbSlideBackend
 from he2ihc_align.slide_io.factory import open_slide
@@ -72,10 +72,19 @@ class TestOpenSlideBackend:
         assert arr.dtype == np.uint8
 
     def test_read_region_different_level(self, openslide_backend):
-        if openslide_backend.level_count > 1:
-            arr = openslide_backend.read_region((0, 0), 1, (128, 128))
-            assert arr.shape == (128, 128, 3)
-            assert arr.dtype == np.uint8
+        if openslide_backend.level_count <= 1:
+            pytest.skip("Only one level available")
+        arr = openslide_backend.read_region((0, 0), 1, (128, 128))
+        assert arr.shape == (128, 128, 3)
+        assert arr.dtype == np.uint8
+
+    def test_read_region_invalid_level_raises(self, openslide_backend):
+        with pytest.raises(SlideIOError):
+            openslide_backend.read_region((0, 0), openslide_backend.level_count + 1, (128, 128))
+
+    def test_read_region_out_of_bounds_raises(self, openslide_backend):
+        with pytest.raises(SlideIOError):
+            openslide_backend.read_region((999999999, 999999999), 0, (256, 256))
 
     def test_get_best_level_for_downsample(self, openslide_backend):
         level = openslide_backend.get_best_level_for_downsample(4.0)
@@ -109,10 +118,19 @@ class TestKfbSlideBackend:
         assert arr.dtype == np.uint8
 
     def test_read_region_different_level(self, kfb_backend):
-        if kfb_backend.level_count > 1:
-            arr = kfb_backend.read_region((0, 0), 1, (128, 128))
-            assert arr.shape == (128, 128, 3)
-            assert arr.dtype == np.uint8
+        if kfb_backend.level_count <= 1:
+            pytest.skip("Only one level available")
+        arr = kfb_backend.read_region((0, 0), 1, (128, 128))
+        assert arr.shape == (128, 128, 3)
+        assert arr.dtype == np.uint8
+
+    def test_read_region_invalid_level_raises(self, kfb_backend):
+        with pytest.raises(SlideIOError):
+            kfb_backend.read_region((0, 0), kfb_backend.level_count + 1, (128, 128))
+
+    def test_read_region_out_of_bounds_raises(self, kfb_backend):
+        with pytest.raises(SlideIOError):
+            kfb_backend.read_region((999999999, 999999999), 0, (256, 256))
 
     def test_get_best_level_for_downsample(self, kfb_backend):
         level = kfb_backend.get_best_level_for_downsample(4.0)

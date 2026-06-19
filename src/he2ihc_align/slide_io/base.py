@@ -2,9 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Protocol, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import numpy as np
+from PIL import Image
+
+
+class SlideIOError(Exception):
+    """Raised when a slide I/O operation fails."""
+
+
+def _pil_to_rgb_array(pil_img: Image.Image) -> np.ndarray:
+    """Convert a PIL image to a HWC uint8 RGB numpy array.
+
+    Handles RGBA images by compositing onto a white background.
+    """
+    if pil_img.mode == "RGBA":
+        bg = Image.new("RGB", pil_img.size, (255, 255, 255))
+        bg.paste(pil_img, mask=pil_img.split()[3])
+        pil_img = bg
+    else:
+        pil_img = pil_img.convert("RGB")
+    return np.array(pil_img)
 
 
 @runtime_checkable
@@ -17,7 +36,7 @@ class Slide(Protocol):
         ...
 
     @property
-    def level_dimensions(self) -> list[Tuple[int, int]]:
+    def level_dimensions(self) -> list[tuple[int, int]]:
         """Dimensions (width, height) for each level."""
         ...
 
@@ -31,7 +50,7 @@ class Slide(Protocol):
         """Slide metadata as key-value strings."""
         ...
 
-    def read_region(self, location: Tuple[int, int], level: int, size: Tuple[int, int]) -> np.ndarray:
+    def read_region(self, location: tuple[int, int], level: int, size: tuple[int, int]) -> np.ndarray:
         """Read a region from the slide.
 
         Args:
