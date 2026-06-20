@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import yaml
 
 from he2ihc_align.case_io import discover_case
@@ -16,7 +14,12 @@ from he2ihc_align.mapping import build_mapping_table
 from he2ihc_align.patching import sample_grid_patches
 from he2ihc_align.registration.registrar import HEIHCRegistrar
 from he2ihc_align.slide_io.factory import open_slide
-from he2ihc_align.viz import create_html_gallery, fig_to_data_uri, make_patch_figure, read_patch_rgb
+from he2ihc_align.viz import (
+    create_html_gallery,
+    fig_to_data_uri,
+    make_patch_figure,
+    read_patch_rgb,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

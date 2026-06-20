@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import kfbslide
+import numpy as np
 
 from he2ihc_align.slide_io.base import SlideIOError, _pil_to_rgb_array
 

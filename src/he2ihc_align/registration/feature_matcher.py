@@ -6,14 +6,13 @@ Keeps only brute-force matching with RANSAC outlier rejection.
 
 from __future__ import annotations
 
-import numpy as np
 import cv2
+import numpy as np
+from skimage import transform
 from sklearn import metrics
 from sklearn.metrics.pairwise import pairwise_kernels
-from skimage import transform
 
-from . import warp_tools
-from . import feature_detectors
+from . import feature_detectors, warp_tools
 
 EPS = np.finfo(float).eps
 
@@ -63,8 +62,8 @@ def filter_matches_tukey(src_xy, dst_xy, tform=transform.SimilarityTransform()):
     if len(src_xy) < 3:
         return src_xy, dst_xy, np.arange(len(src_xy))
     tform = transform.SimilarityTransform.from_estimate(src=dst_xy, dst=src_xy)
-    M = tform.params
-    warped_xy = warp_tools.warp_xy(src_xy, M)
+    tform_params = tform.params
+    warped_xy = warp_tools.warp_xy(src_xy, M=tform_params)
     d = warp_tools.calc_d(warped_xy, dst_xy)
 
     q1 = np.quantile(d, 0.25)
@@ -186,14 +185,9 @@ def match_desc_and_kp(desc1, kp1_xy, desc2, kp2_xy, metric=None,
 
     desc1_match_idx = matches[:, 0]
     matched_kp1_xy = kp1_xy[desc1_match_idx, :]
-    matched_desc1 = desc1[desc1_match_idx, :]
 
     desc2_match_idx = matches[:, 1]
     matched_kp2_xy = kp2_xy[desc2_match_idx, :]
-    matched_desc2 = desc2[desc2_match_idx, :]
-
-    mean_unfiltered_distance = np.mean(match_distances) if len(match_distances) > 0 else 0
-    mean_unfiltered_similarity = np.mean(convert_distance_to_similarity(match_distances, n_features=desc1.shape[1])) if len(match_distances) > 0 else 0
 
     n_matches = len(matches)
     match_info12 = MatchInfo(

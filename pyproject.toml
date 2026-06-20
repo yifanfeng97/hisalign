@@ -58,8 +58,7 @@ markers = [
     "slow: tests that require real slide files and take significant time",
 ]
 
-[tool.ruff]
-line-length = 120
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
 
@@ -70,4 +69,5 @@ convention = "google"
 dev = [
     "pytest>=9.1.0",
     "pytest-cov>=7.1.0",
+    "ruff",
 ]

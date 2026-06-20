@@ -13,7 +13,6 @@ from he2ihc_align.mapping import build_mapping_table
 from he2ihc_align.registration.registrar import HEIHCRegistrar
 from he2ihc_align.slide_io.factory import open_slide
 
-
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 
 

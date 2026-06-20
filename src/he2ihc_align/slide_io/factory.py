@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from he2ihc_align.slide_io.base import Slide
-from he2ihc_align.slide_io.openslide_backend import OpenSlideBackend
 from he2ihc_align.slide_io.kfb_backend import KfbSlideBackend
-
+from he2ihc_align.slide_io.openslide_backend import OpenSlideBackend
 
 # Extensions natively supported by OpenSlide
 OPENSLIDE_EXTS = {".svs", ".tif", ".tiff", ".mrxs", ".ndpi", ".scn", ".vms", ".vmu"}

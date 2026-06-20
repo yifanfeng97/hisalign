@@ -7,10 +7,8 @@ Simplified to single reference + N moving images.
 
 from __future__ import annotations
 
-import numpy as np
 import cv2
-from scipy import ndimage
-from tqdm import tqdm
+import numpy as np
 
 from . import warp_tools
 
@@ -238,7 +236,7 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
     @staticmethod
     def get_default_params(img_shape, grid_spacing_ratio=0.025):
         """Get default Elastix parameters."""
-        import SimpleITK as sitk
+        import SimpleITK as sitk  # noqa: N813
         p = sitk.GetDefaultParameterMap("bspline")
         p["Metric"] = ['AdvancedMattesMutualInformation', 'TransformBendingEnergyPenalty']
         p["MaximumNumberOfIterations"] = ['1500']
@@ -263,7 +261,7 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
 
     def calc(self, moving_img, fixed_img, mask=None, moving_xy=None, fixed_xy=None, **kwargs):
         """Calculate non-rigid registration using SimpleElastix."""
-        import SimpleITK as sitk
+        import SimpleITK as sitk  # noqa: N813  # noqa: N813
 
         assert moving_img.shape == fixed_img.shape, "Images have different shapes"
 
@@ -312,7 +310,7 @@ class NonRigidRegistrar:
         Rigid transformation matrix.
     """
 
-    def __init__(self, ref_img, moving_img, M=None, ref_name="ref", moving_name="moving"):
+    def __init__(self, ref_img, moving_img, M=None, ref_name="ref", moving_name="moving"):  # noqa: N803
         self.ref_img = ref_img
         self.moving_img = moving_img
         self.ref_name = ref_name
@@ -386,8 +384,8 @@ class NonRigidRegistrar:
             nr_xy = xy.copy()
 
         # Apply inverse rigid
-        M_inv = np.linalg.inv(self.M)
-        return warp_tools.warp_xy(nr_xy, M=M_inv)
+        m_inv = np.linalg.inv(self.M)
+        return warp_tools.warp_xy(nr_xy, M=m_inv)
 
     def warp_image(self, img, out_shape_rc=None):
         """Warp image using both rigid and non-rigid transforms."""

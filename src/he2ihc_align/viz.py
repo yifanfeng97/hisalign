@@ -50,8 +50,6 @@ def read_patch_rgb(
 
     downsample = slide.level_downsamples[level]
     # Read at the requested level with size scaled accordingly
-    level_x = int(x / downsample)
-    level_y = int(y / downsample)
     level_w = max(1, int(w / downsample))
     level_h = max(1, int(h / downsample))
 
@@ -156,7 +154,7 @@ def create_html_gallery(
         "<!DOCTYPE html>",
         "<html>",
         "<head>",
-        f'  <meta charset="UTF-8">',
+        '  <meta charset="UTF-8">',
         f'  <title>Gallery - {slide_id}</title>',
         "  <style>",
         "    body { font-family: sans-serif; margin: 20px; }",

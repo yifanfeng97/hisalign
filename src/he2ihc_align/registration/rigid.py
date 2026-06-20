@@ -7,13 +7,9 @@ Simplified to single reference + N moving images (no serial Z-stack logic).
 from __future__ import annotations
 
 import numpy as np
-import cv2
-from skimage.transform import EuclideanTransform, SimilarityTransform, AffineTransform
-from tqdm import tqdm
+from skimage.transform import AffineTransform, EuclideanTransform, SimilarityTransform
 
-from . import warp_tools
-from . import feature_detectors
-from . import feature_matcher
+from . import feature_detectors, feature_matcher, warp_tools
 
 
 class RigidRegistrar:
@@ -103,9 +99,9 @@ class RigidRegistrar:
 
         # Ensure homogeneous
         if self.M.shape == (2, 3):
-            M33 = np.eye(3)
-            M33[0:2, :] = self.M
-            self.M = M33
+            m33 = np.eye(3)
+            m33[0:2, :] = self.M
+            self.M = m33
 
         return self
 
@@ -141,8 +137,8 @@ class RigidRegistrar:
         warped_xy : ndarray
             (N, 2) points in moving image coordinates.
         """
-        M_inv = np.linalg.inv(self.M)
-        return warp_tools.warp_xy(xy, M=M_inv)
+        m_inv = np.linalg.inv(self.M)
+        return warp_tools.warp_xy(xy, M=m_inv)
 
     def warp_image(self, img, out_shape_rc=None):
         """Warp an image using the estimated transform.

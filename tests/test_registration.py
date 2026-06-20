@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from he2ihc_align.slide_io.factory import open_slide
 from he2ihc_align.registration.registrar import HEIHCRegistrar
-
+from he2ihc_align.slide_io.factory import open_slide
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 

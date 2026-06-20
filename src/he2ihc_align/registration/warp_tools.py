@@ -6,10 +6,9 @@ Keeps only essential warping, transformation, and utility functions.
 
 from __future__ import annotations
 
-import numpy as np
 import cv2
+import numpy as np
 from scipy import ndimage
-from skimage import transform
 
 
 def get_shape(img):
@@ -46,12 +45,12 @@ def get_padding_matrix(src_shape_rc, dst_shape_rc):
     """Get transformation matrix to pad image to dst_shape."""
     tx = (dst_shape_rc[1] - src_shape_rc[1]) / 2
     ty = (dst_shape_rc[0] - src_shape_rc[0]) / 2
-    T = np.array([
+    tform = np.array([
         [1, 0, tx],
         [0, 1, ty],
         [0, 0, 1],
     ], dtype=np.float64)
-    return T
+    return tform
 
 
 def get_corners_of_image(shape_rc):
@@ -66,7 +65,7 @@ def get_corners_of_image(shape_rc):
     return corners
 
 
-def warp_xy(xy, M=None, bk_dxdy=None, fwd_dxdy=None):
+def warp_xy(xy, M=None, bk_dxdy=None, fwd_dxdy=None):  # noqa: N803
     """Warp points using affine matrix and/or displacement field.
 
     Parameters
@@ -120,7 +119,7 @@ def warp_xy(xy, M=None, bk_dxdy=None, fwd_dxdy=None):
     return warped
 
 
-def warp_xy_from_to(xy, src_M, src_bk_dxdy, dst_M, dst_bk_dxdy,
+def warp_xy_from_to(xy, src_M, src_bk_dxdy, dst_M, dst_bk_dxdy,  # noqa: N803
                     src_fwd_dxdy=None, dst_fwd_dxdy=None):
     """Warp points from src image space to dst image space.
 
@@ -136,19 +135,19 @@ def warp_xy_from_to(xy, src_M, src_bk_dxdy, dst_M, dst_bk_dxdy,
     # Step 2: Unwarp from reference to dst (apply inverse of dst transforms)
     # We need to invert dst_M
     if dst_M is not None:
-        dst_M_inv = np.linalg.inv(dst_M)
+        dst_m_inv = np.linalg.inv(dst_M)
     else:
-        dst_M_inv = None
+        dst_m_inv = None
 
     # To go from reference to dst, we apply the inverse of dst's forward warping
     # dst warps its points to ref using (M, fwd_dxdy)
     # So to go from ref to dst, we apply inverse
-    dst_xy = warp_xy(ref_xy, M=dst_M_inv, bk_dxdy=dst_bk_dxdy)
+    dst_xy = warp_xy(ref_xy, M=dst_m_inv, bk_dxdy=dst_bk_dxdy)
 
     return dst_xy
 
 
-def warp_img(img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear", bg_color=None):
+def warp_img(img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear", bg_color=None):  # noqa: N803
     """Warp image using affine matrix and/or backwards displacement field.
 
     Parameters
@@ -254,7 +253,7 @@ def get_inverse_field(bk_dxdy, n_inter=10):
     return [fwd_dx, fwd_dy]
 
 
-def remove_invasive_displacements(bk_dxdy, M, src_shape_rc, out_shape_rc, inpaint_holes=False):
+def remove_invasive_displacements(bk_dxdy, M, src_shape_rc, out_shape_rc, inpaint_holes=False):  # noqa: N803
     """Remove displacements that would distort image edges.
 
     Simplified version that zeros out displacements outside the affine mask.

@@ -9,8 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from he2ihc_align.cli import main, run_case
-
+from he2ihc_align.cli import run_case
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 
@@ -49,7 +48,7 @@ class TestRunCaseMocked:
         mock_create_html_gallery,
         mock_build_mapping_table,
         mock_sample_grid_patches,
-        mock_HEIHCRegistrar,
+        mock_he_ihc_registrar,
         mock_open_slide,
         tmp_path,
     ):
@@ -71,7 +70,7 @@ class TestRunCaseMocked:
         mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
 
         registrar = MockRegistrar()
-        mock_HEIHCRegistrar.return_value = registrar
+        mock_he_ihc_registrar.return_value = registrar
 
         mock_sample_grid_patches.return_value = [
             (0, 0, 512, 512),
@@ -123,7 +122,7 @@ class TestRunCaseMocked:
         # Verify orchestration
         mock_discover_case.assert_called_once_with(case_dir)
         mock_open_slide.assert_called()
-        mock_HEIHCRegistrar.assert_called_once()
+        mock_he_ihc_registrar.assert_called_once()
         mock_sample_grid_patches.assert_called_once()
         mock_build_mapping_table.assert_called_once()
         mock_create_html_gallery.assert_called_once()
@@ -142,7 +141,7 @@ class TestRunCaseMocked:
         mock_create_html_gallery,
         mock_build_mapping_table,
         mock_sample_grid_patches,
-        mock_HEIHCRegistrar,
+        mock_he_ihc_registrar,
         mock_open_slide,
         tmp_path,
     ):
@@ -164,7 +163,7 @@ class TestRunCaseMocked:
         mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
 
         registrar = MockRegistrar()
-        mock_HEIHCRegistrar.return_value = registrar
+        mock_he_ihc_registrar.return_value = registrar
 
         mock_sample_grid_patches.return_value = [
             (0, 0, 512, 512),
@@ -219,7 +218,7 @@ class TestRunCaseMocked:
         mock_create_html_gallery,
         mock_build_mapping_table,
         mock_sample_grid_patches,
-        mock_HEIHCRegistrar,
+        mock_he_ihc_registrar,
         mock_open_slide,
         tmp_path,
     ):
@@ -241,7 +240,7 @@ class TestRunCaseMocked:
         mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
 
         registrar = MockRegistrar()
-        mock_HEIHCRegistrar.return_value = registrar
+        mock_he_ihc_registrar.return_value = registrar
 
         mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
 

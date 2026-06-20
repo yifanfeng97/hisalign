@@ -12,7 +12,6 @@ import pytest
 
 from he2ihc_align.cli import run_case
 
-
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 
 

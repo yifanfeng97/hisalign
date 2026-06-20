@@ -10,12 +10,12 @@ from skimage import color as skcolor
 from skimage import exposure
 from tqdm import tqdm
 
+from he2ihc_align.registration import (
+    non_rigid,
+    rigid,
+    warp_tools,
+)
 from he2ihc_align.slide_io.base import Slide
-from . import feature_detectors
-from . import feature_matcher
-from . import rigid
-from . import non_rigid
-from . import warp_tools
 
 
 def _read_slide_at_level(slide: Slide, level: int, max_dim_px: int | None = None) -> np.ndarray:
@@ -138,22 +138,22 @@ class HEIHCRegistrar:
 
                 # Scale rigid transform to new resolution
                 scale_factor = max(he_nr_gray.shape) / max(self.he_gray.shape)
-                M_scaled = rigid_reg.M.copy()
-                M_scaled[0, 0] *= scale_factor
-                M_scaled[0, 1] *= scale_factor
-                M_scaled[1, 0] *= scale_factor
-                M_scaled[1, 1] *= scale_factor
-                M_scaled[0, 2] *= scale_factor
-                M_scaled[1, 2] *= scale_factor
+                m_scaled = rigid_reg.M.copy()
+                m_scaled[0, 0] *= scale_factor
+                m_scaled[0, 1] *= scale_factor
+                m_scaled[1, 0] *= scale_factor
+                m_scaled[1, 1] *= scale_factor
+                m_scaled[0, 2] *= scale_factor
+                m_scaled[1, 2] *= scale_factor
             else:
                 he_nr_gray = self.he_gray
                 ihc_nr_gray = ihc_gray
-                M_scaled = rigid_reg.M.copy()
+                m_scaled = rigid_reg.M.copy()
 
             nr_reg = non_rigid.NonRigidRegistrar(
                 ref_img=he_nr_gray,
                 moving_img=ihc_nr_gray,
-                M=M_scaled,
+                M=m_scaled,
                 ref_name="HE",
                 moving_name=marker,
             )
