@@ -1,0 +1,15 @@
+data_root: /home/fengyifan/disk/code/valis/test_SCCE
+output_root: ./outputs
+batch_dir_name: "第一批"
+
+patch_size: 512
+stride: 512
+he_level: 0
+registration_level: 3
+max_white_ratio: 0.95
+
+max_image_dim_px: 1024
+max_non_rigid_dim_px: 2048
+
+mapping_csv_name: mapping.csv
+viz_sample_n: 5

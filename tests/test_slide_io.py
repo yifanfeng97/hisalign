@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -46,31 +47,59 @@ def kfb_backend(kfb_path):
 
 
 # ---------------------------------------------------------------------------
+# MockSlide fixture for fast unit tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def mock_slide():
+    """Return a MagicMock that satisfies the Slide protocol."""
+    slide = MagicMock()
+    slide.level_count = 4
+    slide.level_dimensions = [(10000, 10000), (5000, 5000), (2500, 2500), (1250, 1250)]
+    slide.level_downsamples = [1.0, 2.0, 4.0, 8.0]
+    slide.properties = {"mock": "true"}
+
+    def _read_region(location, level, size):
+        return np.random.randint(0, 255, (size[1], size[0], 3), dtype=np.uint8)
+
+    slide.read_region = _read_region
+    slide.get_best_level_for_downsample = lambda d: 0
+    return slide
+
+
+# ---------------------------------------------------------------------------
 # OpenSlideBackend tests
 # ---------------------------------------------------------------------------
 
 class TestOpenSlideBackend:
+    @pytest.mark.slow
     def test_is_slide_instance(self, openslide_backend):
         assert isinstance(openslide_backend, Slide)
 
+    @pytest.mark.slow
     def test_level_count_positive(self, openslide_backend):
         assert openslide_backend.level_count > 0
 
+    @pytest.mark.slow
     def test_level_dimensions_match_count(self, openslide_backend):
         assert len(openslide_backend.level_dimensions) == openslide_backend.level_count
 
+    @pytest.mark.slow
     def test_level_downsamples_match_count(self, openslide_backend):
         assert len(openslide_backend.level_downsamples) == openslide_backend.level_count
 
+    @pytest.mark.slow
     def test_properties_is_dict(self, openslide_backend):
         assert isinstance(openslide_backend.properties, dict)
 
+    @pytest.mark.slow
     def test_read_region_shape_and_dtype(self, openslide_backend):
         arr = openslide_backend.read_region((0, 0), 0, (256, 256))
         assert isinstance(arr, np.ndarray)
         assert arr.shape == (256, 256, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_different_level(self, openslide_backend):
         if openslide_backend.level_count <= 1:
             pytest.skip("Only one level available")
@@ -78,6 +107,7 @@ class TestOpenSlideBackend:
         assert arr.shape == (128, 128, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_level0_location_at_higher_level(self, openslide_backend):
         """Verify that location is interpreted as level-0 coordinates."""
         if openslide_backend.level_count <= 3:
@@ -96,14 +126,17 @@ class TestOpenSlideBackend:
         assert arr.shape == (64, 64, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_invalid_level_raises(self, openslide_backend):
         with pytest.raises(SlideIOError):
             openslide_backend.read_region((0, 0), openslide_backend.level_count + 1, (128, 128))
 
+    @pytest.mark.slow
     def test_read_region_out_of_bounds_raises(self, openslide_backend):
         with pytest.raises(SlideIOError):
             openslide_backend.read_region((999999999, 999999999), 0, (256, 256))
 
+    @pytest.mark.slow
     def test_get_best_level_for_downsample(self, openslide_backend):
         level = openslide_backend.get_best_level_for_downsample(4.0)
         assert 0 <= level < openslide_backend.level_count
@@ -114,27 +147,34 @@ class TestOpenSlideBackend:
 # ---------------------------------------------------------------------------
 
 class TestKfbSlideBackend:
+    @pytest.mark.slow
     def test_is_slide_instance(self, kfb_backend):
         assert isinstance(kfb_backend, Slide)
 
+    @pytest.mark.slow
     def test_level_count_positive(self, kfb_backend):
         assert kfb_backend.level_count > 0
 
+    @pytest.mark.slow
     def test_level_dimensions_match_count(self, kfb_backend):
         assert len(kfb_backend.level_dimensions) == kfb_backend.level_count
 
+    @pytest.mark.slow
     def test_level_downsamples_match_count(self, kfb_backend):
         assert len(kfb_backend.level_downsamples) == kfb_backend.level_count
 
+    @pytest.mark.slow
     def test_properties_is_dict(self, kfb_backend):
         assert isinstance(kfb_backend.properties, dict)
 
+    @pytest.mark.slow
     def test_read_region_shape_and_dtype(self, kfb_backend):
         arr = kfb_backend.read_region((0, 0), 0, (256, 256))
         assert isinstance(arr, np.ndarray)
         assert arr.shape == (256, 256, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_different_level(self, kfb_backend):
         if kfb_backend.level_count <= 1:
             pytest.skip("Only one level available")
@@ -142,6 +182,7 @@ class TestKfbSlideBackend:
         assert arr.shape == (128, 128, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_level0_location_at_higher_level(self, kfb_backend):
         """Verify that location is interpreted as level-0 coordinates."""
         if kfb_backend.level_count <= 3:
@@ -160,14 +201,17 @@ class TestKfbSlideBackend:
         assert arr.shape == (64, 64, 3)
         assert arr.dtype == np.uint8
 
+    @pytest.mark.slow
     def test_read_region_invalid_level_raises(self, kfb_backend):
         with pytest.raises(SlideIOError):
             kfb_backend.read_region((0, 0), kfb_backend.level_count + 1, (128, 128))
 
+    @pytest.mark.slow
     def test_read_region_out_of_bounds_raises(self, kfb_backend):
         with pytest.raises(SlideIOError):
             kfb_backend.read_region((999999999, 999999999), 0, (256, 256))
 
+    @pytest.mark.slow
     def test_get_best_level_for_downsample(self, kfb_backend):
         level = kfb_backend.get_best_level_for_downsample(4.0)
         assert 0 <= level < kfb_backend.level_count
@@ -178,11 +222,13 @@ class TestKfbSlideBackend:
 # ---------------------------------------------------------------------------
 
 class TestFactory:
+    @pytest.mark.slow
     def test_open_svs_returns_openslide(self, svs_path):
         slide = open_slide(svs_path)
         assert isinstance(slide, OpenSlideBackend)
         slide.close()
 
+    @pytest.mark.slow
     def test_open_kfb_returns_kfb(self, kfb_path):
         slide = open_slide(kfb_path)
         assert isinstance(slide, KfbSlideBackend)
@@ -200,6 +246,7 @@ class TestFactory:
 # ---------------------------------------------------------------------------
 
 class TestDiscoverCase:
+    @pytest.mark.slow
     def test_discover_174162_1(self):
         case_dir = TEST_DATA / "174162-1"
         he_path, markers = discover_case(case_dir)

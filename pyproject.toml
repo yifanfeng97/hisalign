@@ -48,11 +48,15 @@ dev = [
 he2ihc-align = "he2ihc_align.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/he2ihc_align"]
+packages = ["he2ihc_align"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: tests that require real slide files and take significant time",
+]
 
 [tool.ruff]
 line-length = 120
