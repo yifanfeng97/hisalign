@@ -50,6 +50,12 @@ hisalign = "hisalign.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/hisalign"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "examples/images/*.jpg",
+    "examples/images/*.png",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
