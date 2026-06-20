@@ -50,6 +50,16 @@ uv run python scripts/run_pipeline.py --case-dir /path/to/case/第一批 --outpu
 
 ---
 
+## 输出 / Outputs
+
+每个病例输出目录下包含：
+
+- `mapping.csv`：HE patch 到每个 IHC marker 的坐标映射表
+- `gallery.html`：**patch 级别**可视化，随机展示若干 HE patch 及其对应的各 marker IHC patch
+- `report.html`：**slide 级别**配准质量报告，包含全图叠加对比、配准误差统计、每个 marker 的缩略图和形变场
+
+---
+
 ## 输出 CSV 格式 / Output CSV Format
 
 `mapping.csv` 包含以下列：
@@ -88,7 +98,16 @@ max_image_dim_px: 1024
 max_non_rigid_dim_px: 2048
 
 mapping_csv_name: mapping.csv
+
+# Patch-level gallery
 viz_sample_n: 5
+viz_random_seed: 42
+viz_sample_clipped: true
+
+# Slide-level report
+report_level: 3
+max_report_dim_px: 2048
+generate_report: true
 ```
 
 关键配置项说明：
@@ -104,7 +123,12 @@ viz_sample_n: 5
 | `max_white_ratio` | 最大允许空白比例，超过则丢弃该 patch |
 | `max_image_dim_px` | 刚性配准最大图像尺寸 |
 | `max_non_rigid_dim_px` | 非刚性配准最大图像尺寸 |
-| `viz_sample_n` | 可视化 gallery 中展示的 patch 数量，设为 0 则不生成 |
+| `viz_sample_n` | patch 级别 gallery 中展示的 patch 数量，设为 0 则不生成 |
+| `viz_random_seed` | 随机采样 patch 的随机种子，设为 `null` 则非确定性 |
+| `viz_sample_clipped` | 是否允许采样 IHC bbox 超出边界的 patch（会在图上标红） |
+| `report_level` | slide 级别报告缩略图使用的金字塔层级 |
+| `max_report_dim_px` | slide 级别报告缩略图最大边长 |
+| `generate_report` | 是否生成 slide 级别 `report.html` |
 
 ---
 

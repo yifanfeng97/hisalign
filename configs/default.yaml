@@ -12,4 +12,13 @@ max_image_dim_px: 1024
 max_non_rigid_dim_px: 2048
 
 mapping_csv_name: mapping.csv
+
+# Patch-level gallery
 viz_sample_n: 5
+viz_random_seed: 42
+viz_sample_clipped: true
+
+# Slide-level report
+report_level: 3
+max_report_dim_px: 2048
+generate_report: true

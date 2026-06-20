@@ -106,6 +106,7 @@ class TestRunCaseMocked:
             "max_non_rigid_dim_px": 2048,
             "mapping_csv_name": "mapping.csv",
             "viz_sample_n": 2,
+            "generate_report": False,
         }
         output_dir = tmp_path / "outputs"
 
@@ -195,6 +196,7 @@ class TestRunCaseMocked:
             "max_non_rigid_dim_px": 2048,
             "mapping_csv_name": "mapping.csv",
             "viz_sample_n": 0,
+            "generate_report": False,
         }
         output_dir = tmp_path / "outputs"
 
@@ -272,6 +274,7 @@ class TestRunCaseMocked:
             "max_non_rigid_dim_px": 2048,
             "mapping_csv_name": "mapping.csv",
             "viz_sample_n": 2,
+            "generate_report": False,
         }
         output_dir = tmp_path / "outputs"
 
@@ -280,6 +283,160 @@ class TestRunCaseMocked:
         mock_create_html_gallery.assert_called_once()
         call_args = mock_create_html_gallery.call_args
         assert call_args[0][0] == output_dir / "gallery.html"
+
+    @patch("he2ihc_align.cli._generate_report")
+    @patch("he2ihc_align.cli.open_slide")
+    @patch("he2ihc_align.cli.HEIHCRegistrar")
+    @patch("he2ihc_align.cli.sample_grid_patches")
+    @patch("he2ihc_align.cli.build_mapping_table")
+    @patch("he2ihc_align.cli.create_html_gallery")
+    @patch("he2ihc_align.cli.read_patch_rgb")
+    @patch("he2ihc_align.cli.discover_case")
+    def test_run_case_generates_report_when_enabled(
+        self,
+        mock_discover_case,
+        mock_read_patch_rgb,
+        mock_create_html_gallery,
+        mock_build_mapping_table,
+        mock_sample_grid_patches,
+        mock_he_ihc_registrar,
+        mock_open_slide,
+        mock_generate_report,
+        tmp_path,
+    ):
+        """Test that run_case calls report generation when generate_report is true."""
+        parent_dir = tmp_path / "test_case"
+        parent_dir.mkdir()
+        case_dir = parent_dir / "batch"
+        case_dir.mkdir()
+        he_path = case_dir / "test.kfb"
+        he_path.write_text("mock")
+        markers = {"CD3": case_dir / "test CD3.svs"}
+        for p in markers.values():
+            p.write_text("mock")
+        mock_discover_case.return_value = (he_path, markers)
+
+        he_slide = MagicMock()
+        ihc_slide = MagicMock()
+        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
+
+        registrar = MockRegistrar()
+        mock_he_ihc_registrar.return_value = registrar
+
+        mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
+
+        df = pd.DataFrame({
+            "patch_id": ["test_case_0000"],
+            "slide_id": ["test_case"],
+            "marker": ["CD3"],
+            "he_x": [0],
+            "he_y": [0],
+            "he_w": [512],
+            "he_h": [512],
+            "ihc_x": [10],
+            "ihc_y": [20],
+            "ihc_w": [512],
+            "ihc_h": [512],
+            "clipped": [False],
+        })
+        mock_build_mapping_table.return_value = df
+
+        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
+
+        config = {
+            "patch_size": 512,
+            "stride": 512,
+            "he_level": 0,
+            "registration_level": 3,
+            "max_white_ratio": 1.0,
+            "max_image_dim_px": 1024,
+            "max_non_rigid_dim_px": 2048,
+            "mapping_csv_name": "mapping.csv",
+            "viz_sample_n": 0,
+            "generate_report": True,
+        }
+        output_dir = tmp_path / "outputs"
+
+        run_case(case_dir, config, output_dir)
+
+        mock_generate_report.assert_called_once()
+
+    @patch("he2ihc_align.cli._generate_report")
+    @patch("he2ihc_align.cli.open_slide")
+    @patch("he2ihc_align.cli.HEIHCRegistrar")
+    @patch("he2ihc_align.cli.sample_grid_patches")
+    @patch("he2ihc_align.cli.build_mapping_table")
+    @patch("he2ihc_align.cli.create_html_gallery")
+    @patch("he2ihc_align.cli.read_patch_rgb")
+    @patch("he2ihc_align.cli.discover_case")
+    def test_run_case_skips_report_when_disabled(
+        self,
+        mock_discover_case,
+        mock_read_patch_rgb,
+        mock_create_html_gallery,
+        mock_build_mapping_table,
+        mock_sample_grid_patches,
+        mock_he_ihc_registrar,
+        mock_open_slide,
+        mock_generate_report,
+        tmp_path,
+    ):
+        """Test that run_case skips report generation when generate_report is false."""
+        parent_dir = tmp_path / "test_case"
+        parent_dir.mkdir()
+        case_dir = parent_dir / "batch"
+        case_dir.mkdir()
+        he_path = case_dir / "test.kfb"
+        he_path.write_text("mock")
+        markers = {"CD3": case_dir / "test CD3.svs"}
+        for p in markers.values():
+            p.write_text("mock")
+        mock_discover_case.return_value = (he_path, markers)
+
+        he_slide = MagicMock()
+        ihc_slide = MagicMock()
+        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
+
+        registrar = MockRegistrar()
+        mock_he_ihc_registrar.return_value = registrar
+
+        mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
+
+        df = pd.DataFrame({
+            "patch_id": ["test_case_0000"],
+            "slide_id": ["test_case"],
+            "marker": ["CD3"],
+            "he_x": [0],
+            "he_y": [0],
+            "he_w": [512],
+            "he_h": [512],
+            "ihc_x": [10],
+            "ihc_y": [20],
+            "ihc_w": [512],
+            "ihc_h": [512],
+            "clipped": [False],
+        })
+        mock_build_mapping_table.return_value = df
+
+        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
+
+        config = {
+            "patch_size": 512,
+            "stride": 512,
+            "he_level": 0,
+            "registration_level": 3,
+            "max_white_ratio": 1.0,
+            "max_image_dim_px": 1024,
+            "max_non_rigid_dim_px": 2048,
+            "mapping_csv_name": "mapping.csv",
+            "viz_sample_n": 0,
+            "generate_report": False,
+        }
+        output_dir = tmp_path / "outputs"
+
+        run_case(case_dir, config, output_dir)
+
+        mock_generate_report.assert_not_called()
 
 
 class TestRunCaseReal:
@@ -299,6 +456,7 @@ class TestRunCaseReal:
             "max_non_rigid_dim_px": 2048,
             "mapping_csv_name": "mapping.csv",
             "viz_sample_n": 2,
+            "generate_report": True,
         }
         output_dir = tmp_path / "outputs"
 

@@ -18,7 +18,9 @@ from he2ihc_align.registration import (
 from he2ihc_align.slide_io.base import Slide
 
 
-def _read_slide_at_level(slide: Slide, level: int, max_dim_px: int | None = None) -> np.ndarray:
+def _read_slide_at_level(
+    slide: Slide, level: int, max_dim_px: int | None = None
+) -> tuple[np.ndarray, float]:
     """Read a whole slide at a given pyramid level, optionally resizing.
 
     Parameters
@@ -35,16 +37,21 @@ def _read_slide_at_level(slide: Slide, level: int, max_dim_px: int | None = None
     -------
     img : np.ndarray
         HWC uint8 RGB image.
+    scale_to_level0 : float
+        Scale factor converting a pixel in the returned image to level-0 pixels.
     """
+    level0_w, level0_h = slide.level_dimensions[0]
     w, h = slide.level_dimensions[level]
     img = slide.read_region((0, 0), level, (w, h))
 
+    actual_w, actual_h = w, h
     if max_dim_px is not None and max(w, h) > max_dim_px:
-        scale = max_dim_px / max(w, h)
-        new_w, new_h = int(w * scale), int(h * scale)
-        img = warp_tools.resize_img(img, (new_h, new_w))
+        resize_scale = max_dim_px / max(w, h)
+        actual_w, actual_h = int(w * resize_scale), int(h * resize_scale)
+        img = warp_tools.resize_img(img, (actual_h, actual_w))
 
-    return img
+    scale_to_level0 = max(level0_w, level0_h) / max(actual_w, actual_h)
+    return img, scale_to_level0
 
 
 def _to_grayscale(img: np.ndarray) -> np.ndarray:
@@ -94,17 +101,24 @@ class HEIHCRegistrar:
         self.rigid_registrars: dict[str, rigid.RigidRegistrar] = {}
         self.non_rigid_registrars: dict[str, non_rigid.NonRigidRegistrarBase] = {}
 
+        # Scale factors from processed registration image pixels to level-0 pixels
+        self.he_scale_to_level0: float = 1.0
+        self.ihc_scale_to_level0: dict[str, float] = {}
+
         # Read HE image at registration level
-        self.he_img = _read_slide_at_level(he_slide, registration_level, max_dim_px=max_image_dim_px)
+        self.he_img, self.he_scale_to_level0 = _read_slide_at_level(
+            he_slide, registration_level, max_dim_px=max_image_dim_px
+        )
         self.he_gray = _to_grayscale(self.he_img)
 
         # Read IHC images at registration level
         self.ihc_imgs = {}
         self.ihc_grays = {}
         for marker, slide in ihc_slides.items():
-            img = _read_slide_at_level(slide, registration_level, max_dim_px=max_image_dim_px)
+            img, scale = _read_slide_at_level(slide, registration_level, max_dim_px=max_image_dim_px)
             self.ihc_imgs[marker] = img
             self.ihc_grays[marker] = _to_grayscale(img)
+            self.ihc_scale_to_level0[marker] = scale
 
     def fit(self) -> "HEIHCRegistrar":
         """Run rigid + non-rigid registration for all IHC slides.
@@ -127,11 +141,11 @@ class HEIHCRegistrar:
             # Non-rigid registration
             # Use higher resolution for non-rigid if requested
             if self.max_non_rigid_dim_px > self.max_image_dim_px:
-                he_nr = _read_slide_at_level(
+                he_nr, _ = _read_slide_at_level(
                     self.he_slide, self.registration_level, max_dim_px=self.max_non_rigid_dim_px
                 )
                 he_nr_gray = _to_grayscale(he_nr)
-                ihc_nr = _read_slide_at_level(
+                ihc_nr, _ = _read_slide_at_level(
                     self.ihc_slides[marker], self.registration_level, max_dim_px=self.max_non_rigid_dim_px
                 )
                 ihc_nr_gray = _to_grayscale(ihc_nr)
