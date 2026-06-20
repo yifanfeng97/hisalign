@@ -232,10 +232,7 @@ hisalign/
 │   ├── register_jpg.py
 │   └── images/
 │       ├── he.jpg
-│       ├── ihc.jpg
-│       ├── overlay_unregistered.jpg
-│       ├── overlay_rigid.jpg
-│       └── overlay_nonrigid.jpg
+│       └── ihc.jpg
 ├── src/hisalign/
 │   ├── api.py
 │   ├── cli.py
@@ -265,11 +262,13 @@ This registers the real whole-slide thumbnails in `examples/images/` and produce
 
 ### Example Results
 
-Green = H&E, magenta = CD3 IHC. Overlapping structures appear white/gray when aligned.
+After running the command above, open the generated overlays:
 
-| Before registration | After non-rigid registration |
-| --- | --- |
-| ![Unregistered](examples/images/overlay_unregistered.jpg) | ![Non-rigid](examples/images/overlay_nonrigid.jpg) |
+- `out/00_unregistered.png` — green/magenta overlay before registration (structures are shifted).
+- `out/01_rigid.png` — overlay after rigid registration.
+- `out/02_nonrigid.png` — overlay after non-rigid registration; overlapping structures turn white/gray.
+
+Green = H&E, magenta = CD3 IHC.
 
 ---
 

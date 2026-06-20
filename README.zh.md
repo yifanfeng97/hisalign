@@ -235,10 +235,7 @@ hisalign/
 │   ├── register_jpg.py
 │   └── images/
 │       ├── he.jpg
-│       ├── ihc.jpg
-│       ├── overlay_unregistered.jpg
-│       ├── overlay_rigid.jpg
-│       └── overlay_nonrigid.jpg
+│       └── ihc.jpg
 ├── src/hisalign/
 │   ├── api.py
 │   ├── cli.py
@@ -268,11 +265,13 @@ python examples/register_jpg.py --output-dir ./out
 
 ### 配准效果示例
 
-绿色 = H&E，洋红色 = CD3 IHC。结构重合时会呈现白/灰色。
+运行上面的命令后，打开生成的叠加图即可看到效果：
 
-| 配准前 | 非刚性配准后 |
-| --- | --- |
-| ![Unregistered](examples/images/overlay_unregistered.jpg) | ![Non-rigid](examples/images/overlay_nonrigid.jpg) |
+- `out/00_unregistered.png` — 配准前的绿/洋红叠加图，结构存在偏移。
+- `out/01_rigid.png` — 刚性配准后的叠加图。
+- `out/02_nonrigid.png` — 非刚性配准后的叠加图，结构重合处会呈现白/灰色。
+
+绿色 = H&E，洋红色 = CD3 IHC。
 
 ---
 
