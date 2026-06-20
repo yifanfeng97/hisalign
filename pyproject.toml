@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "hisalign team" },
+    { name = "Yifan Feng", email = "evanfeng97@gmail.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

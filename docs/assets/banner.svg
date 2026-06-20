@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e94560"/>
+      <stop offset="50%" stop-color="#f7b731"/>
+      <stop offset="100%" stop-color="#20bf6b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="320" fill="url(#bg)"/>
+  <g opacity="0.15">
+    <circle cx="1200" cy="80" r="160" fill="#e94560"/>
+    <circle cx="200" cy="260" r="120" fill="#20bf6b"/>
+  </g>
+  <text x="720" y="150" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="700" fill="#ffffff">🔬 HISAlign</text>
+  <text x="720" y="210" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" fill="#b8c5d6">H&amp;E ↔ IHC Whole-Slide Image Alignment</text>
+  <rect x="420" y="250" width="600" height="6" rx="3" fill="url(#accent)"/>
+</svg>
