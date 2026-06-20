@@ -51,11 +51,15 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
     # Discover HE and IHC slides directly in the batch directory
     case_dir = Path(case_dir)
     he_path, markers = discover_case(case_dir)
-    case_id = case_dir.parent.name  # e.g. "174162-1"
+    # Derive case_id from HE path: if HE is in a batch subdir, use parent.parent;
+    # otherwise use parent (case directory itself)
+    batch_dir_name = config.get("batch_dir_name", "第一批")
+    if he_path.parent.name.endswith(batch_dir_name):
+        case_id = he_path.parent.parent.name
+    else:
+        case_id = he_path.parent.name
 
-    slide_id = case_id
-
-    logger.info("Case %s: HE=%s, markers=%s", slide_id, he_path.name, list(markers.keys()))
+    logger.info("Case %s: HE=%s, markers=%s", case_id, he_path.name, list(markers.keys()))
 
     # Open slides
     he_slide = open_slide(he_path)
@@ -71,7 +75,7 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
             max_non_rigid_dim_px=config.get("max_non_rigid_dim_px", 2048),
         )
         registrar.fit()
-        logger.info("Registration complete for %s", slide_id)
+        logger.info("Registration complete for %s", case_id)
 
         # Sample patches
         he_patch_bboxes = sample_grid_patches(
@@ -81,7 +85,7 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
             level=config.get("he_level", 0),
             max_white_ratio=config.get("max_white_ratio", 0.95),
         )
-        logger.info("Sampled %d patches for %s", len(he_patch_bboxes), slide_id)
+        logger.info("Sampled %d patches for %s", len(he_patch_bboxes), case_id)
 
         # Build mapping table
         # bboxes from sample_grid_patches are always in level-0 coordinates
@@ -90,7 +94,7 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
             he_slide=he_slide,
             ihc_slides=ihc_slides,
             he_patch_bboxes=he_patch_bboxes,
-            slide_id=slide_id,
+            slide_id=case_id,
             he_level=0,
             ihc_level=0,
         )
@@ -112,7 +116,10 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
 
                 ihc_patches = {}
                 for marker in ihc_slides:
-                    row = df[(df["patch_id"] == f"{slide_id}_{idx:04d}") & (df["marker"] == marker)].iloc[0]
+                    rows = df[(df["patch_id"] == f"{case_id}_{idx:04d}") & (df["marker"] == marker)]
+                    if rows.empty:
+                        continue
+                    row = rows.iloc[0]
                     ihc_x, ihc_y, ihc_w, ihc_h = int(row["ihc_x"]), int(row["ihc_y"]), int(row["ihc_w"]), int(row["ihc_h"])
                     if ihc_w > 0 and ihc_h > 0:
                         ihc_patch = read_patch_rgb(ihc_slides[marker], ihc_x, ihc_y, ihc_w, ihc_h, level=0)
@@ -121,13 +128,13 @@ def run_case(case_dir: Path, config: dict, output_dir: Path) -> Path:
                         ihc_patch = np.zeros((he_h, he_w, 3), dtype=np.uint8)
                     ihc_patches[marker] = ihc_patch
 
-                title = f"{slide_id} patch {idx:04d} (HE: {he_x},{he_y} {he_w}x{he_h})"
+                title = f"{case_id} patch {idx:04d} (HE: {he_x},{he_y} {he_w}x{he_h})"
                 fig = make_patch_figure(he_patch, ihc_patches, title)
                 data_uri = fig_to_data_uri(fig)
                 gallery_entries.append({"title": title, "data_uri": data_uri})
 
             gallery_path = output_dir / "gallery.html"
-            create_html_gallery(gallery_path, slide_id, gallery_entries)
+            create_html_gallery(gallery_path, case_id, gallery_entries)
             logger.info("Wrote gallery HTML to %s", gallery_path)
 
     finally:

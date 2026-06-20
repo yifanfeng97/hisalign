@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import io
 from pathlib import Path
 
@@ -155,7 +156,7 @@ def create_html_gallery(
         "<html>",
         "<head>",
         '  <meta charset="UTF-8">',
-        f'  <title>Gallery - {slide_id}</title>',
+        f'  <title>Gallery - {html.escape(slide_id)}</title>',
         "  <style>",
         "    body { font-family: sans-serif; margin: 20px; }",
         "    .entry { margin-bottom: 40px; }",
@@ -164,13 +165,14 @@ def create_html_gallery(
         "  </style>",
         "</head>",
         "<body>",
-        f'  <h1>Gallery - {slide_id}</h1>',
+        f'  <h1>Gallery - {html.escape(slide_id)}</h1>',
     ]
 
     for entry in entries:
+        title = html.escape(entry["title"])
         html_parts.append('  <div class="entry">')
-        html_parts.append(f'    <h3>{entry["title"]}</h3>')
-        html_parts.append(f'    <img src="{entry["data_uri"]}" alt="{entry["title"]}">')
+        html_parts.append(f'    <h3>{title}</h3>')
+        html_parts.append(f'    <img src="{entry["data_uri"]}" alt="{title}">')
         html_parts.append("  </div>")
 
     html_parts.extend(["</body>", "</html>"])
