@@ -48,7 +48,7 @@ dev = [
 he2ihc-align = "he2ihc_align.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["he2ihc_align"]
+packages = ["src/he2ihc_align"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
