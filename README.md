@@ -232,7 +232,10 @@ hisalign/
 │   ├── register_jpg.py
 │   └── images/
 │       ├── he.jpg
-│       └── ihc.jpg
+│       ├── ihc.jpg
+│       ├── overlay_unregistered.jpg
+│       ├── overlay_rigid.jpg
+│       └── overlay_nonrigid.jpg
 ├── src/hisalign/
 │   ├── api.py
 │   ├── cli.py
@@ -245,15 +248,28 @@ hisalign/
 
 ---
 
-## 🧪 Tests
+## 🧪 Try It
+
+The fastest way to verify the installation and see HISAlign in action is to run the bundled example:
 
 ```bash
-# Fast tests (default)
-uv run pytest tests/ -v
-
-# Include slow integration tests that require real slide files
-uv run pytest tests/ -v -m slow
+python examples/register_jpg.py --output-dir ./out
 ```
+
+This registers the real whole-slide thumbnails in `examples/images/` and produces:
+
+- `out/model.pkl`
+- `out/00_unregistered.png`
+- `out/01_rigid.png`
+- `out/02_nonrigid.png`
+
+### Example Results
+
+Green = H&E, magenta = CD3 IHC. Overlapping structures appear white/gray when aligned.
+
+| Before registration | After non-rigid registration |
+| --- | --- |
+| ![Unregistered](examples/images/overlay_unregistered.jpg) | ![Non-rigid](examples/images/overlay_nonrigid.jpg) |
 
 ---
 

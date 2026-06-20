@@ -235,7 +235,10 @@ hisalign/
 │   ├── register_jpg.py
 │   └── images/
 │       ├── he.jpg
-│       └── ihc.jpg
+│       ├── ihc.jpg
+│       ├── overlay_unregistered.jpg
+│       ├── overlay_rigid.jpg
+│       └── overlay_nonrigid.jpg
 ├── src/hisalign/
 │   ├── api.py
 │   ├── cli.py
@@ -248,15 +251,28 @@ hisalign/
 
 ---
 
-## 🧪 测试
+## 🧪 快速体验
+
+验证安装并直观感受 HISAlign 效果的最快方式，是直接运行仓库自带的例子：
 
 ```bash
-# 快速测试（默认）
-uv run pytest tests/ -v
-
-# 包含真实切片数据的慢速集成测试
-uv run pytest tests/ -v -m slow
+python examples/register_jpg.py --output-dir ./out
 ```
+
+这条命令会对 `examples/images/` 里的真实 WSI 缩略图进行配准，并生成：
+
+- `out/model.pkl`
+- `out/00_unregistered.png`
+- `out/01_rigid.png`
+- `out/02_nonrigid.png`
+
+### 配准效果示例
+
+绿色 = H&E，洋红色 = CD3 IHC。结构重合时会呈现白/灰色。
+
+| 配准前 | 非刚性配准后 |
+| --- | --- |
+| ![Unregistered](examples/images/overlay_unregistered.jpg) | ![Non-rigid](examples/images/overlay_nonrigid.jpg) |
 
 ---
 
