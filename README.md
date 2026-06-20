@@ -5,45 +5,46 @@
 <h1 align="center">🔬 HISAlign</h1>
 
 <p align="center">
-  <b>将多标记 IHC/IF 切片配准到 H&E 参考切片 · Whole-slide alignment for H&E and multiplex IHC</b>
+  <b>Whole-slide image alignment for H&E and multiplex IHC markers</b>
 </p>
 
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square" alt="Python 3.11+"></a>
   <a href="#"><img src="https://img.shields.io/badge/version-0.2.0-orange?style=flat-square" alt="Version 0.2.0"></a>
   <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License"></a>
+  <span> · </span>
+  <a href="README.zh.md">简体中文</a>
 </p>
 
 ---
 
-> 💡 **一句话介绍 / One-liner**  
-> HISAlign 把每张 IHC marker 切片的空间坐标统一到同一张 H&E 切片上，输出一个可离线使用的 `.pkl` 配准模型。  
+> 💡 **One-liner**  
 > HISAlign registers each IHC marker slide into the H&E reference space and produces a standalone `.pkl` alignment model for offline coordinate mapping.
 
 ---
 
-## ✨ 为什么需要 HISAlign / Why HISAlign
+## ✨ Why HISAlign
 
-| 问题 / Problem | HISAlign 的做法 / Solution |
+| Problem | Solution |
 | --- | --- |
-| 同一组织切了 H&E 和多张 IHC，空间位置对不上 | 刚性 + 光流非刚性配准，逐 marker 对齐到 H&E |
-| 配准结果依赖打开的切片句柄，难以复用 | 只保存 numpy 数组与变换参数，完全可序列化 |
-| 下游分析需要把 HE 上的 ROI 坐标转到 IHC | 离线 `warp_xy` 接口，输入 level-0 坐标即可 |
-| 需要快速评估配准质量 | 自动生成 patch 级 gallery 与 slide 级 report |
+| H&E and multiple IHC slides of the same tissue are spatially misaligned | Rigid + optical-flow non-rigid registration, per-marker alignment to H&E |
+| Registration results depend on open slide handles and are hard to reuse | Only numpy arrays and transform parameters are saved; fully serializable |
+| Downstream analysis needs to map ROIs from H&E to IHC | Offline `warp_xy` interface: provide level-0 coordinates and get mapped coordinates |
+| Need a quick way to assess registration quality | Optional patch-level `gallery.html` and slide-level `report.html` |
 
 ---
 
-## 🎨 工作流程 / Workflow
+## 🎨 Workflow
 
 ```mermaid
 flowchart LR
-    HE["H&E Reference\n参考切片"]
+    HE["H&E Reference"]
     IHC["IHC Markers\nCD3 / Ki67 / ..."]
-    PRE["Optical Density\n预处理"]
-    RIGID["Rigid Registration\n刚性配准"]
-    NR["Optical-Flow Non-Rigid\n光流非刚性"]
-    MODEL["model.pkl\n可序列化模型"]
-    WARP["warp_xy\n离线坐标映射"]
+    PRE["Optical Density\nPreprocessing"]
+    RIGID["Rigid Registration"]
+    NR["Optical-Flow\nNon-Rigid"]
+    MODEL["model.pkl\nSerializable Model"]
+    WARP["warp_xy\nOffline Mapping"]
     VIZ["gallery.html\nreport.html"]
 
     HE --> PRE
@@ -57,13 +58,13 @@ flowchart LR
 
 ---
 
-## 🚀 安装 / Installation
+## 🚀 Installation
 
 ```bash
 uv sync && uv pip install -e .
 ```
 
-验证入口：
+Verify the CLI entry point:
 
 ```bash
 hisalign --help
@@ -71,14 +72,14 @@ hisalign --help
 
 ---
 
-## 🧪 30 秒上手 / Quickstart
+## 🧪 Quickstart
 
 ### Python API
 
 ```python
 from hisalign import HisAlign, HisAlignModel
 
-# 1. 配准并保存模型 / Fit and save the model
+# 1. Fit and save the model
 aligner = HisAlign(
     he_path="HE.kfb",
     ihc_paths={"CD3": "CD3.svs", "Ki67": "Ki67.svs"},
@@ -86,24 +87,24 @@ aligner = HisAlign(
     max_image_dim_px=1024,
     preprocessing="od",
     feature_detector="kaze",
-    mpp=0.25,  # 当切片元数据缺少 MPP 时显式指定
+    mpp=0.25,  # explicit when slide metadata lacks MPP
 )
 model = aligner.fit()
 model.save("model.pkl")
 
-# 2. 离线坐标映射 / Offline coordinate mapping
+# 2. Offline coordinate mapping (no slides needed)
 loaded = HisAlignModel.load("model.pkl")
 mapped = loaded.warp_xy(
-    coords=[[1000, 2000]],  # HE level-0 像素坐标
+    coords=[[1000, 2000]],  # H&E level-0 pixel coordinates
     marker="CD3",
     direction="he_to_ihc",
 )
 print(mapped)  # -> [[ihc_x, ihc_y]]
 ```
 
-### 命令行 / CLI
+### CLI
 
-**1. 配准 / Register**
+**1. Register and save the model**
 
 ```bash
 hisalign register \
@@ -115,10 +116,9 @@ hisalign register \
   --mpp 0.25
 ```
 
-> 可省略 `marker=`，marker 名会从文件名的最后一段自动提取。  
 > If you omit `marker=`, the marker name is derived from the last token of the filename stem.
 
-**2. 坐标映射 / Warp coordinates**
+**2. Warp coordinates with the model**
 
 ```bash
 hisalign warp \
@@ -129,7 +129,9 @@ hisalign warp \
   --output mapped.csv
 ```
 
-**3. 生成可视化 / Visualize**
+The input CSV must contain `x` and `y` columns; the output adds `marker` and `direction` columns.
+
+**3. Generate visualizations**
 
 ```bash
 hisalign visualize \
@@ -138,33 +140,13 @@ hisalign visualize \
   --config configs/default.yaml
 ```
 
+`register` also generates `gallery.html` and `report.html` automatically when visualization is enabled.
+
 ---
 
-## 🖼️ 也能玩普通图片 / Works with plain images too
+## 🖼️ Works with Plain Images Too
 
-仓库里自带了一对从真实 WSI 导出的缩略图（`examples/images/he.jpg` 与 `examples/images/ihc.jpg`），可以直接跑：
-
-```bash
-python examples/register_jpg.py --output-dir ./out
-```
-
-如果想用合成数据做最小可复现实验：
-
-```bash
-python examples/register_jpg.py --synthetic --output-dir ./out
-```
-
-或者用你自己的 `.jpg`/`.png`：
-
-```bash
-python examples/register_jpg.py \
-  --he path/to/he.jpg \
-  --ihc path/to/ihc.jpg \
-  --output-dir ./out
-```
-
-The repo includes whole-slide thumbnail exports of an H&E slide and a CD3
-IHC slide (`examples/images/he.jpg` and `examples/images/ihc.jpg`) for a quick demo:
+The repo includes whole-slide thumbnail exports of an H&E slide and a CD3 IHC slide (`examples/images/he.jpg` and `examples/images/ihc.jpg`) for a quick demo:
 
 ```bash
 python examples/register_jpg.py --output-dir ./out
@@ -184,103 +166,105 @@ python examples/register_jpg.py --he he.jpg --ihc ihc.jpg --output-dir ./out
 
 ---
 
-## 📐 坐标约定 / Coordinate Convention
+## 📐 Coordinate Convention
 
-> ⚠️ **所有坐标均为 level-0（最高分辨率）像素坐标。**  
-> **All coordinates are level-0 (highest resolution) pixel coordinates.**
+> ⚠️ **All coordinates are level-0 (highest resolution) pixel coordinates.**
 
-- 顺序为 `(x, y)`，即 `(列, 行)` / Order is `(x, y)` = `(column, row)`.
-- 原点在切片左上角 / Origin is the top-left corner.
-- 其他层级坐标请手动缩放到 level-0 后再调用 `warp_xy`.  
-  For coordinates from another pyramid level, scale them to level-0 first.
+- Order is `(x, y)` = `(column, row)`.
+- Origin is the top-left corner.
+- For coordinates from another pyramid level, scale them to level-0 first.
 
 ---
 
-## 📦 支持格式 / Supported Formats
+## 📦 Supported Formats
 
-| 类型 / Type | 格式 / Formats |
+| Type | Formats |
 | --- | --- |
-| KFBio 原生 | `.kfb` |
+| KFBio native | `.kfb` |
 | OpenSlide | `.svs`, `.tif`/`.tiff`, `.ndpi`, `.vms`/`.vmu`, `.mrxs`, `.scn` |
-| 普通图片 / Plain images | `.jpg`, `.jpeg`, `.png`, `.bmp` |
+| Plain images | `.jpg`, `.jpeg`, `.png`, `.bmp` |
 
 ---
 
-## 📤 输出 / Outputs
+## 📤 Outputs
 
-运行 `hisalign register` 后，你会得到：
+After running `hisalign register`:
 
-- `model.pkl` — 可序列化的配准模型，包含所有空间变换参数，后续无需打开原始切片。
+- `model.pkl` — serializable alignment model containing all spatial transforms; no original slides required afterwards.
 
-若开启可视化，还会在同目录生成：
+If visualization is enabled, the same directory also contains:
 
-- `gallery.html` — **patch 级别**随机采样可视化，对比 HE 与每个 marker 的 IHC patch。
-- `report.html` — **slide 级别**配准质量报告，含叠加图、rTRE、marker 缩略图与形变场。
+- `gallery.html` — **patch-level** random sampling visualization comparing H&E patches with each marker's IHC patch.
+- `report.html` — **slide-level** registration quality report with overlay comparisons, rTRE statistics, per-marker thumbnails, and deformation fields.
 
 ---
 
-## ⚙️ 配置 / Configuration
+## ⚙️ Configuration
 
-`configs/default.yaml` 关键项：
+Key items in `configs/default.yaml`:
 
 ```yaml
-registration_level: 3          # 配准金字塔层级
-max_image_dim_px: 1024         # 配准图像最大边长
-preprocessing: "od"            # "od" 光学密度 ｜ "gray" 普通灰度
+registration_level: 3          # pyramid level used for registration
+max_image_dim_px: 1024         # longest side of the processed registration image
+preprocessing: "od"            # "od" optical density | "gray" simple grayscale
 feature_detector: "kaze"       # kaze / akaze / sift / orb / brisk
 feature_n_levels: 3
-match_max_ratio: 1.0           # Lowe ratio test，1.0 关闭
-mpp: null                      # level-0 像素尺寸（µm/px），缺失时显式设置
+match_max_ratio: 1.0           # Lowe ratio test; 1.0 disables
+mpp: null                      # level-0 pixel size (µm/px); set when metadata is missing
 
-# 可视化
-viz_sample_n: 5                # gallery 采样 patch 数，0 不生成
-generate_report: true          # 是否生成 report.html
-report_rtre_threshold: 5.0     # rTRE 良好阈值
+# Visualization
+viz_sample_n: 5                # number of patches in gallery, 0 to disable
+generate_report: true          # whether to generate report.html
+report_rtre_threshold: 5.0     # rTRE threshold for "good" highlighting
 ```
 
 ---
 
-## 🗂️ 项目结构 / Project Structure
+## 🗂️ Project Structure
 
 ```text
 hisalign/
 ├── README.md
+├── README.zh.md
 ├── pyproject.toml
 ├── configs/default.yaml
 ├── examples/
-│   └── register_jpg.py          # 普通图片配准示例
+│   ├── register_jpg.py
+│   └── images/
+│       ├── he.jpg
+│       └── ihc.jpg
 ├── src/hisalign/
-│   ├── api.py                   # HisAlign / HisAlignModel
-│   ├── cli.py                   # 命令行入口
-│   ├── preprocessing.py         # OD / 灰度预处理
-│   ├── registration/            # 刚性 + 非刚性配准核心
-│   ├── slide_io/                # WSI / 普通图片读取后端
-│   └── viz.py                   # 可视化
+│   ├── api.py
+│   ├── cli.py
+│   ├── preprocessing.py
+│   ├── registration/
+│   ├── slide_io/
+│   └── viz.py
 └── tests/
 ```
 
 ---
 
-## 🧪 测试 / Tests
+## 🧪 Tests
 
 ```bash
-# 快速测试
+# Fast tests (default)
 uv run pytest tests/ -v
 
-# 包含真实切片数据的慢速集成测试
+# Include slow integration tests that require real slide files
 uv run pytest tests/ -v -m slow
 ```
 
 ---
 
-## 🙋 作者 / Author
+## 🙋 Author
 
 Created with 💙 by **Yifan Feng**  
 📧 [evanfeng97@gmail.com](mailto:evanfeng97@gmail.com)
 
 ---
 
-## 📚 参考 / References
+## 📚 References
 
 - VALIS: Virtual Alignment of pathology Image Series
 - DISK: Learning local features with policy gradient (Tyszkiewicz et al., NeurIPS 2020)
@@ -289,6 +273,5 @@ Created with 💙 by **Yifan Feng**
 ---
 
 <p align="center">
-  <i>让病理切片的空间对齐像拼图一样直观。</i><br>
   <i>Making whole-slide alignment as intuitive as solving a jigsaw puzzle.</i>
 </p>
