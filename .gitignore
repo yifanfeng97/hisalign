@@ -50,6 +50,7 @@ htmlcov/
 
 # Outputs
 outputs/
+out/
 
 # Data (symlinks or local copies)
 data/
