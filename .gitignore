@@ -61,3 +61,6 @@ data/
 *.csv
 *.tiff
 *.tif
+
+# Superpowers docs (session artifacts, not source)
+docs/superpower*

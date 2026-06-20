@@ -8,11 +8,12 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from he2ihc_align.case_io import discover_case
-from he2ihc_align.slide_io.base import Slide, SlideIOError
-from he2ihc_align.slide_io.factory import open_slide
-from he2ihc_align.slide_io.kfb_backend import KfbSlideBackend
-from he2ihc_align.slide_io.openslide_backend import OpenSlideBackend
+from hisalign.case_io import discover_case
+from hisalign.slide_io.base import Slide, SlideIOError
+from hisalign.slide_io.factory import open_slide
+from hisalign.slide_io.image_backend import ImageSlideBackend
+from hisalign.slide_io.kfb_backend import KfbSlideBackend
+from hisalign.slide_io.openslide_backend import OpenSlideBackend
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 
@@ -20,6 +21,7 @@ TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def svs_path():
@@ -49,6 +51,7 @@ def kfb_backend(kfb_path):
 # MockSlide fixture for fast unit tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_slide():
     """Return a MagicMock that satisfies the Slide protocol."""
@@ -69,6 +72,7 @@ def mock_slide():
 # ---------------------------------------------------------------------------
 # OpenSlideBackend tests
 # ---------------------------------------------------------------------------
+
 
 class TestOpenSlideBackend:
     @pytest.mark.slow
@@ -128,7 +132,9 @@ class TestOpenSlideBackend:
     @pytest.mark.slow
     def test_read_region_invalid_level_raises(self, openslide_backend):
         with pytest.raises(SlideIOError):
-            openslide_backend.read_region((0, 0), openslide_backend.level_count + 1, (128, 128))
+            openslide_backend.read_region(
+                (0, 0), openslide_backend.level_count + 1, (128, 128)
+            )
 
     @pytest.mark.slow
     def test_read_region_out_of_bounds_raises(self, openslide_backend):
@@ -144,6 +150,7 @@ class TestOpenSlideBackend:
 # ---------------------------------------------------------------------------
 # KfbSlideBackend tests
 # ---------------------------------------------------------------------------
+
 
 class TestKfbSlideBackend:
     @pytest.mark.slow
@@ -220,6 +227,7 @@ class TestKfbSlideBackend:
 # Factory tests
 # ---------------------------------------------------------------------------
 
+
 class TestFactory:
     @pytest.mark.slow
     def test_open_svs_returns_openslide(self, svs_path):
@@ -240,9 +248,56 @@ class TestFactory:
             open_slide(bad)
 
 
+class TestImageSlideBackend:
+    """Fast unit tests for the static-image backend."""
+
+    @pytest.fixture
+    def rgb_path(self, tmp_path):
+        img = np.zeros((120, 200, 3), dtype=np.uint8)
+        img[:, :100] = [255, 0, 0]
+        img[:, 100:] = [0, 255, 0]
+        path = tmp_path / "test.png"
+        from PIL import Image
+
+        Image.fromarray(img).save(path)
+        return path
+
+    def test_open_png_returns_image_backend(self, rgb_path):
+        slide = open_slide(rgb_path)
+        assert isinstance(slide, ImageSlideBackend)
+        slide.close()
+
+    def test_level_dimensions_match_image_size(self, rgb_path):
+        with ImageSlideBackend(rgb_path) as slide:
+            assert slide.level_count == 1
+            assert slide.level_dimensions == [(200, 120)]
+            assert slide.level_downsamples == [1.0]
+
+    def test_read_region_returns_hwc_uint8(self, rgb_path):
+        with ImageSlideBackend(rgb_path) as slide:
+            arr = slide.read_region((50, 30), 0, (80, 60))
+            assert arr.shape == (60, 80, 3)
+            assert arr.dtype == np.uint8
+
+    def test_read_region_clamps_to_bounds(self, rgb_path):
+        with ImageSlideBackend(rgb_path) as slide:
+            arr = slide.read_region((150, 80), 0, (100, 100))
+            assert arr.shape == (40, 50, 3)
+
+    def test_read_region_invalid_level_raises(self, rgb_path):
+        with ImageSlideBackend(rgb_path) as slide:
+            with pytest.raises(SlideIOError):
+                slide.read_region((0, 0), 1, (10, 10))
+
+    def test_get_best_level_returns_zero(self, rgb_path):
+        with ImageSlideBackend(rgb_path) as slide:
+            assert slide.get_best_level_for_downsample(4.0) == 0
+
+
 # ---------------------------------------------------------------------------
 # Case discovery tests
 # ---------------------------------------------------------------------------
+
 
 class TestDiscoverCase:
     @pytest.mark.slow

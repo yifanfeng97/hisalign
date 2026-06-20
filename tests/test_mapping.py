@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from he2ihc_align.mapping import build_mapping_table
-from he2ihc_align.registration.registrar import HEIHCRegistrar
-from he2ihc_align.slide_io.factory import open_slide
+from hisalign.mapping import build_mapping_table
+from hisalign.registration.registrar import HEIHCRegistrar
+from hisalign.slide_io.factory import open_slide
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 
@@ -105,7 +105,9 @@ class TestBuildMappingTable:
         )
         assert isinstance(df, pd.DataFrame)
 
-    def test_outputs_expected_columns(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_outputs_expected_columns(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         """Test that build_mapping_table outputs the expected columns."""
         he_patch_bboxes = [(0, 0, 512, 512), (512, 512, 512, 512), (256, 256, 512, 512)]
         df = build_mapping_table(
@@ -132,7 +134,9 @@ class TestBuildMappingTable:
         assert list(df.columns) == expected_cols
         assert len(df) == 3 * len(mock_ihc_slides)
 
-    def test_row_count_matches_patches_times_markers(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_row_count_matches_patches_times_markers(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         he_patch_bboxes = [(0, 0, 512, 512), (512, 512, 512, 512)]
         df = build_mapping_table(
             registrar=mock_registrar,
@@ -157,7 +161,9 @@ class TestBuildMappingTable:
             assert isinstance(patch_id, str)
             assert patch_id.startswith("test_slide_")
 
-    def test_he_coords_match_input(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_he_coords_match_input(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         he_patch_bboxes = [(100, 200, 512, 512)]
         df = build_mapping_table(
             registrar=mock_registrar,
@@ -194,9 +200,13 @@ class TestBuildMappingTable:
             he_patch_bboxes=he_patch_bboxes,
             slide_id="test_slide",
         )
-        assert df["clipped"].dtype == bool or set(df["clipped"].unique()).issubset({True, False})
+        assert df["clipped"].dtype == bool or set(df["clipped"].unique()).issubset(
+            {True, False}
+        )
 
-    def test_clipped_true_when_out_of_bounds(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_clipped_true_when_out_of_bounds(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         """If the mapped IHC bbox exceeds slide dimensions, clipped should be True."""
         # Use a very large HE coordinate that will map outside IHC
         mock_he_slide.level_dimensions = [(500, 500)]
@@ -224,7 +234,9 @@ class TestBuildMappingTable:
         )
         assert (df["slide_id"] == "my_slide_123").all()
 
-    def test_unique_patch_id_per_marker(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_unique_patch_id_per_marker(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         he_patch_bboxes = [(0, 0, 512, 512), (512, 512, 512, 512)]
         df = build_mapping_table(
             registrar=mock_registrar,
@@ -238,7 +250,9 @@ class TestBuildMappingTable:
             marker_df = df[df["marker"] == marker]
             assert marker_df["patch_id"].nunique() == len(marker_df)
 
-    def test_ihc_coords_have_fixed_offset(self, mock_registrar, mock_he_slide, mock_ihc_slides):
+    def test_ihc_coords_have_fixed_offset(
+        self, mock_registrar, mock_he_slide, mock_ihc_slides
+    ):
         """MockRegistrar adds fixed offset; verify IHC coords reflect that."""
         he_patch_bboxes = [(0, 0, 100, 100)]
         df = build_mapping_table(
@@ -258,9 +272,12 @@ class TestBuildMappingTable:
         assert row["ihc_h"] == 100
 
     @pytest.mark.slow
-    def test_build_mapping_table_with_real_registrar(self, real_registrar, real_he_slide, real_ihc_slides):
+    def test_build_mapping_table_with_real_registrar(
+        self, real_registrar, real_he_slide, real_ihc_slides
+    ):
         """Integration test with real registrar and slides."""
-        from he2ihc_align.patching import sample_grid_patches
+        from hisalign.patching import sample_grid_patches
+
         he_patch_bboxes = sample_grid_patches(
             real_he_slide, patch_size=512, stride=512, level=3, max_white_ratio=1.0
         )[:3]

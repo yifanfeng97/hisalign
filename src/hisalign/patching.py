@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from he2ihc_align.slide_io.base import Slide
+from hisalign.slide_io.base import Slide
 
 
 def sample_grid_patches(
@@ -76,11 +76,15 @@ def sample_grid_patches(
     tile_size = max(patch_size, stride) * 4
 
     # Group patches by tile
-    tile_patches: dict[tuple[int, int], list[tuple[int, int, int, int, int, int, int, int]]] = {}
+    tile_patches: dict[
+        tuple[int, int], list[tuple[int, int, int, int, int, int, int, int]]
+    ] = {}
     for x_level, y_level, pw, ph, x0, y0, w0, h0 in patch_positions:
         tile_x = (x_level // tile_size) * tile_size
         tile_y = (y_level // tile_size) * tile_size
-        tile_patches.setdefault((tile_x, tile_y), []).append((x_level, y_level, pw, ph, x0, y0, w0, h0))
+        tile_patches.setdefault((tile_x, tile_y), []).append(
+            (x_level, y_level, pw, ph, x0, y0, w0, h0)
+        )
 
     for (tile_x, tile_y), patches in tile_patches.items():
         # Compute tile bounds covering all patches in this tile

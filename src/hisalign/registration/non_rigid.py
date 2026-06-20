@@ -76,7 +76,9 @@ class NonRigidRegistrarBase:
             masked_moving = moving_img.copy()
             masked_fixed = fixed_img.copy()
 
-        bk_dxdy = self.calc(moving_img=masked_moving, fixed_img=masked_fixed, mask=mask, **kwargs)
+        bk_dxdy = self.calc(
+            moving_img=masked_moving, fixed_img=masked_fixed, mask=mask, **kwargs
+        )
 
         if self.mask is not None and bk_dxdy is not None:
             bk_dx = np.zeros(self.shape)
@@ -107,9 +109,9 @@ class NonRigidRegistrarBase:
         """Create an image of a regular grid."""
         grid_img = np.zeros(self.shape[:2])
         for r in range(0, self.shape[0], grid_spacing):
-            grid_img[r:r+thickness, :] = 255
+            grid_img[r : r + thickness, :] = 255
         for c in range(0, self.shape[1], grid_spacing):
-            grid_img[:, c:c+thickness] = 255
+            grid_img[:, c : c + thickness] = 255
         return grid_img
 
 
@@ -119,7 +121,9 @@ class OpticalFlowWarper(NonRigidRegistrarBase):
     Uses OpenCV's DeepFlow or Farneback optical flow.
     """
 
-    def __init__(self, optical_flow_obj=None, smoothing_method="gauss", sigma_ratio=0.005):
+    def __init__(
+        self, optical_flow_obj=None, smoothing_method="gauss", sigma_ratio=0.005
+    ):
         """
         Parameters
         ----------
@@ -171,9 +175,16 @@ class OpticalFlowWarper(NonRigidRegistrarBase):
         else:
             # Use Farneback as fallback
             flow = cv2.calcOpticalFlowFarneback(
-                moving_gray, fixed_gray, None,
-                pyr_scale=0.5, levels=3, winsize=15,
-                iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+                moving_gray,
+                fixed_gray,
+                None,
+                pyr_scale=0.5,
+                levels=3,
+                winsize=15,
+                iterations=3,
+                poly_n=5,
+                poly_sigma=1.2,
+                flags=0,
             )
 
         # flow is (H, W, 2) where flow[..., 0] is dx and flow[..., 1] is dy
@@ -197,14 +208,20 @@ class NonRigidRegistrarXY(NonRigidRegistrarBase):
         self.moving_xy = None
         self.fixed_xy = None
 
-    def register(self, moving_img, fixed_img, mask=None, moving_xy=None, fixed_xy=None, **kwargs):
+    def register(
+        self, moving_img, fixed_img, mask=None, moving_xy=None, fixed_xy=None, **kwargs
+    ):
         """Register with optional corresponding points."""
         if moving_xy is not None and fixed_xy is not None:
-            moving_xy, fixed_xy = self.filter_xy(moving_xy, fixed_xy, moving_img.shape, mask)
+            moving_xy, fixed_xy = self.filter_xy(
+                moving_xy, fixed_xy, moving_img.shape, mask
+            )
 
         self.moving_xy = moving_xy
         self.fixed_xy = fixed_xy
-        return NonRigidRegistrarBase.register(self, moving_img=moving_img, fixed_img=fixed_img, mask=mask, **kwargs)
+        return NonRigidRegistrarBase.register(
+            self, moving_img=moving_img, fixed_img=fixed_img, mask=mask, **kwargs
+        )
 
     def filter_xy(self, moving_xy, fixed_xy, img_shape_rc, mask=None):
         """Remove points outside image and/or mask."""
@@ -222,7 +239,9 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
     Requires SimpleITK to be installed.
     """
 
-    def __init__(self, params=None, ammi_weight=0.33, bending_penalty_weight=0.33, kp_weight=0.33):
+    def __init__(
+        self, params=None, ammi_weight=0.33, bending_penalty_weight=0.33, kp_weight=0.33
+    ):
         super().__init__(params=params)
         self.ammi_weight = ammi_weight
         self.bending_penalty_weight = bending_penalty_weight
@@ -237,12 +256,16 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
     def get_default_params(img_shape, grid_spacing_ratio=0.025):
         """Get default Elastix parameters."""
         import SimpleITK as sitk  # noqa: N813
+
         p = sitk.GetDefaultParameterMap("bspline")
-        p["Metric"] = ['AdvancedMattesMutualInformation', 'TransformBendingEnergyPenalty']
-        p["MaximumNumberOfIterations"] = ['1500']
-        p['FixedImagePyramid'] = ["FixedRecursiveImagePyramid"]
-        p['MovingImagePyramid'] = ["MovingRecursiveImagePyramid"]
-        p['Interpolator'] = ["BSplineInterpolator"]
+        p["Metric"] = [
+            "AdvancedMattesMutualInformation",
+            "TransformBendingEnergyPenalty",
+        ]
+        p["MaximumNumberOfIterations"] = ["1500"]
+        p["FixedImagePyramid"] = ["FixedRecursiveImagePyramid"]
+        p["MovingImagePyramid"] = ["MovingRecursiveImagePyramid"]
+        p["Interpolator"] = ["BSplineInterpolator"]
         p["ImageSampler"] = ["RandomCoordinate"]
         p["MetricSamplingStrategy"] = ["None"]
         p["UseRandomSampleRegion"] = ["true"]
@@ -254,12 +277,23 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
         p["Optimizer"] = ["AdaptiveStochasticGradientDescent"]
         p["ASGDParameterEstimationMethod"] = ["DisplacementDistribution"]
         p["HowToCombineTransforms"] = ["Compose"]
-        grid_spacing = str(int(np.mean([img_shape[1] * grid_spacing_ratio, img_shape[0] * grid_spacing_ratio])))
+        grid_spacing = str(
+            int(
+                np.mean(
+                    [
+                        img_shape[1] * grid_spacing_ratio,
+                        img_shape[0] * grid_spacing_ratio,
+                    ]
+                )
+            )
+        )
         p["FinalGridSpacingInPhysicalUnits"] = [grid_spacing]
         p["WriteResultImage"] = ["false"]
         return p
 
-    def calc(self, moving_img, fixed_img, mask=None, moving_xy=None, fixed_xy=None, **kwargs):
+    def calc(
+        self, moving_img, fixed_img, mask=None, moving_xy=None, fixed_xy=None, **kwargs
+    ):
         """Calculate non-rigid registration using SimpleElastix."""
         import SimpleITK as sitk  # noqa: N813  # noqa: N813
 
@@ -277,14 +311,18 @@ class SimpleElastixWarper(NonRigidRegistrarXY):
         elastix_image_filter.SetParameterMap(self.params)
 
         if mask is not None:
-            sitk_mask = sitk.Cast(sitk.GetImageFromArray(mask.astype(np.uint8)), sitk.sitkUInt8)
+            sitk_mask = sitk.Cast(
+                sitk.GetImageFromArray(mask.astype(np.uint8)), sitk.sitkUInt8
+            )
             elastix_image_filter.SetFixedMask(sitk_mask)
 
         elastix_image_filter.Execute()
 
         # Get deformation field
         transformix = sitk.TransformixImageFilter()
-        transformix.SetTransformParameterMap(elastix_image_filter.GetTransformParameterMap())
+        transformix.SetTransformParameterMap(
+            elastix_image_filter.GetTransformParameterMap()
+        )
         transformix.ComputeDeformationFieldOn()
         transformix.Execute()
         deformation = sitk.GetArrayFromImage(transformix.GetDeformationField())
@@ -310,7 +348,9 @@ class NonRigidRegistrar:
         Rigid transformation matrix.
     """
 
-    def __init__(self, ref_img, moving_img, M=None, ref_name="ref", moving_name="moving"):  # noqa: N803
+    def __init__(
+        self, ref_img, moving_img, M=None, ref_name="ref", moving_name="moving"
+    ):  # noqa: N803
         self.ref_img = ref_img
         self.moving_img = moving_img
         self.ref_name = ref_name
@@ -339,7 +379,9 @@ class NonRigidRegistrar:
             non_rigid_reg_params = {}
 
         # Warp moving image with rigid transform first
-        rigid_warped = warp_tools.warp_img(self.moving_img, M=self.M, out_shape_rc=self.ref_img.shape[0:2])
+        rigid_warped = warp_tools.warp_img(
+            self.moving_img, M=self.M, out_shape_rc=self.ref_img.shape[0:2]
+        )
 
         # Create non-rigid registrar
         if isinstance(non_rigid_reg_class, type):

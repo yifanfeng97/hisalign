@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from he2ihc_align.registration.registrar import HEIHCRegistrar
-from he2ihc_align.slide_io.factory import open_slide
+from hisalign.registration.registrar import HEIHCRegistrar
+from hisalign.slide_io.factory import open_slide
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 

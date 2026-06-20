@@ -1,482 +1,185 @@
-"""Tests for CLI run_case and main entry point."""
+"""Tests for the hisalign CLI subcommands."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from he2ihc_align.cli import run_case
-
-TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
+from hisalign.cli import _cmd_register, _cmd_visualize, _cmd_warp, _parse_ihc_args
 
 
-class MockRegistrar:
-    """Deterministic mock registrar for fast CLI tests."""
+class MockModel:
+    """Deterministic mock model for CLI warp tests."""
 
     def __init__(self, offset_x: float = 10.0, offset_y: float = 20.0):
         self.offset_x = offset_x
         self.offset_y = offset_y
+        self.config = {"registration_level": 3, "feature_detector": "kaze"}
+        self.he_path = "/tmp/HE.kfb"
+        self.ihc_paths = {"CD3": "/tmp/CD3.svs"}
 
-    def fit(self):
-        return self
+    def save(self, path: Path) -> None:
+        Path(path).write_bytes(b"mock")
 
-    def warp_xy_from_he_to_ihc(self, xy, marker):
-        xy = np.asarray(xy, dtype=np.float64)
-        if xy.ndim == 1:
-            xy = xy.reshape(1, -1)
-        return xy + np.array([self.offset_x, self.offset_y])
+    def warp_xy(self, coords, marker, direction):
+        coords = np.asarray(coords, dtype=np.float64)
+        if coords.ndim == 1:
+            coords = coords.reshape(1, -1)
+        if direction == "he_to_ihc":
+            return coords + np.array([self.offset_x, self.offset_y])
+        return coords - np.array([self.offset_x, self.offset_y])
 
 
-class TestRunCaseMocked:
-    """Fast unit tests that mock all heavy dependencies."""
+def test_parse_ihc_args_with_marker():
+    args = ["CD3=/path/to/CD3.svs", "Ki67=/path/to/Ki67.svs"]
+    result = _parse_ihc_args(args)
+    assert set(result.keys()) == {"CD3", "Ki67"}
+    assert result["CD3"].name == "CD3.svs"
 
-    @patch("he2ihc_align.cli.open_slide")
-    @patch("he2ihc_align.cli.HEIHCRegistrar")
-    @patch("he2ihc_align.cli.sample_grid_patches")
-    @patch("he2ihc_align.cli.build_mapping_table")
-    @patch("he2ihc_align.cli.create_html_gallery")
-    @patch("he2ihc_align.cli.read_patch_rgb")
-    @patch("he2ihc_align.cli.discover_case")
-    def test_run_case_produces_csv(
-        self,
-        mock_discover_case,
-        mock_read_patch_rgb,
-        mock_create_html_gallery,
-        mock_build_mapping_table,
-        mock_sample_grid_patches,
-        mock_he_ihc_registrar,
-        mock_open_slide,
-        tmp_path,
-    ):
-        """Test that run_case orchestrates components and writes a CSV."""
-        # Setup mocks - create directory structure: parent/case_dir/...
-        parent_dir = tmp_path / "test_case"
-        parent_dir.mkdir()
-        case_dir = parent_dir / "batch"
-        case_dir.mkdir()
-        he_path = case_dir / "test.kfb"
+
+def test_parse_ihc_args_without_marker(tmp_path):
+    cd3 = tmp_path / "slide CD3.svs"
+    cd3.write_text("mock")
+    ki67 = tmp_path / "slide Ki67.svs"
+    ki67.write_text("mock")
+    result = _parse_ihc_args([str(cd3), str(ki67)])
+    assert set(result.keys()) == {"CD3", "Ki67"}
+
+
+def test_parse_ihc_args_duplicate_marker_raises():
+    with pytest.raises(ValueError, match="Duplicate marker name 'CD3'"):
+        _parse_ihc_args(["CD3=a.svs", "CD3=b.svs"])
+
+
+class TestRegisterCommand:
+    """Fast mocked tests for `hisalign register`."""
+
+    @patch("hisalign.cli._generate_visualizations")
+    @patch("hisalign.cli.HisAlign")
+    def test_register_saves_model(self, mock_hisalign_cls, mock_generate_viz, tmp_path):
+        model = MockModel()
+        aligner = MagicMock()
+        aligner.fit.return_value = model
+        aligner._registrar = MagicMock()
+        mock_hisalign_cls.return_value = aligner
+
+        he_path = tmp_path / "HE.kfb"
         he_path.write_text("mock")
-        markers = {"CD3": case_dir / "test CD3.svs"}
-        for p in markers.values():
-            p.write_text("mock")
-        mock_discover_case.return_value = (he_path, markers)
+        ihc_path = tmp_path / "CD3.svs"
+        ihc_path.write_text("mock")
+        output_path = tmp_path / "model.pkl"
 
-        he_slide = MagicMock()
-        ihc_slide = MagicMock()
-        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("generate_report: false\nviz_sample_n: 0\n")
 
-        registrar = MockRegistrar()
-        mock_he_ihc_registrar.return_value = registrar
+        args = SimpleNamespace(
+            he=he_path,
+            ihc=[f"CD3={ihc_path}"],
+            output=output_path,
+            config=config_path,
+            mpp=None,
+        )
 
-        mock_sample_grid_patches.return_value = [
-            (0, 0, 512, 512),
-            (512, 512, 512, 512),
-        ]
+        _cmd_register(args)
 
-        # DataFrame must include all (patch_id, marker) combinations
-        df = pd.DataFrame({
-            "patch_id": ["test_case_0000", "test_case_0001"],
-            "slide_id": ["test_case", "test_case"],
-            "marker": ["CD3", "CD3"],
-            "he_x": [0, 512],
-            "he_y": [0, 512],
-            "he_w": [512, 512],
-            "he_h": [512, 512],
-            "ihc_x": [10, 522],
-            "ihc_y": [20, 532],
-            "ihc_w": [512, 512],
-            "ihc_h": [512, 512],
-            "clipped": [False, False],
-        })
-        mock_build_mapping_table.return_value = df
+        mock_hisalign_cls.assert_called_once()
+        assert output_path.exists()
+        mock_generate_viz.assert_not_called()
 
-        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
-
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 0,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 2,
-            "generate_report": False,
-        }
-        output_dir = tmp_path / "outputs"
-
-        csv_path = run_case(case_dir, config, output_dir)
-
-        assert csv_path.exists()
-        result_df = pd.read_csv(csv_path)
-        assert len(result_df) == 2
-        assert list(result_df.columns) == [
-            "patch_id", "slide_id", "marker", "he_x", "he_y", "he_w", "he_h",
-            "ihc_x", "ihc_y", "ihc_w", "ihc_h", "clipped",
-        ]
-
-        # Verify orchestration
-        mock_discover_case.assert_called_once_with(case_dir)
-        mock_open_slide.assert_called()
-        mock_he_ihc_registrar.assert_called_once()
-        mock_sample_grid_patches.assert_called_once()
-        mock_build_mapping_table.assert_called_once()
-        mock_create_html_gallery.assert_called_once()
-
-    @patch("he2ihc_align.cli.open_slide")
-    @patch("he2ihc_align.cli.HEIHCRegistrar")
-    @patch("he2ihc_align.cli.sample_grid_patches")
-    @patch("he2ihc_align.cli.build_mapping_table")
-    @patch("he2ihc_align.cli.create_html_gallery")
-    @patch("he2ihc_align.cli.read_patch_rgb")
-    @patch("he2ihc_align.cli.discover_case")
-    def test_run_case_no_gallery_when_viz_zero(
-        self,
-        mock_discover_case,
-        mock_read_patch_rgb,
-        mock_create_html_gallery,
-        mock_build_mapping_table,
-        mock_sample_grid_patches,
-        mock_he_ihc_registrar,
-        mock_open_slide,
-        tmp_path,
+    @patch("hisalign.cli._generate_visualizations")
+    @patch("hisalign.cli.HisAlign")
+    def test_register_triggers_visualizations(
+        self, mock_hisalign_cls, mock_generate_viz, tmp_path
     ):
-        """Test that gallery is not generated when viz_sample_n is 0."""
-        # Setup mocks - create directory structure: parent/case_dir/...
-        parent_dir = tmp_path / "test_case"
-        parent_dir.mkdir()
-        case_dir = parent_dir / "batch"
-        case_dir.mkdir()
-        he_path = case_dir / "test.kfb"
+        model = MockModel()
+        aligner = MagicMock()
+        aligner.fit.return_value = model
+        aligner._registrar = MagicMock()
+        mock_hisalign_cls.return_value = aligner
+
+        he_path = tmp_path / "HE.kfb"
         he_path.write_text("mock")
-        markers = {"CD3": case_dir / "test CD3.svs"}
-        for p in markers.values():
-            p.write_text("mock")
-        mock_discover_case.return_value = (he_path, markers)
+        ihc_path = tmp_path / "CD3.svs"
+        ihc_path.write_text("mock")
+        output_path = tmp_path / "model.pkl"
 
-        he_slide = MagicMock()
-        ihc_slide = MagicMock()
-        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("viz_sample_n: 2\ngenerate_report: true\n")
 
-        registrar = MockRegistrar()
-        mock_he_ihc_registrar.return_value = registrar
+        args = SimpleNamespace(
+            he=he_path,
+            ihc=[f"CD3={ihc_path}"],
+            output=output_path,
+            config=config_path,
+            mpp=None,
+        )
 
-        mock_sample_grid_patches.return_value = [
-            (0, 0, 512, 512),
-        ]
+        _cmd_register(args)
 
-        df = pd.DataFrame({
-            "patch_id": ["test_case_0000"],
-            "slide_id": ["test_case",],
-            "marker": ["CD3"],
-            "he_x": [0],
-            "he_y": [0],
-            "he_w": [512],
-            "he_h": [512],
-            "ihc_x": [10],
-            "ihc_y": [20],
-            "ihc_w": [512],
-            "ihc_h": [512],
-            "clipped": [False],
-        })
-        mock_build_mapping_table.return_value = df
+        mock_generate_viz.assert_called_once()
 
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 0,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 0,
-            "generate_report": False,
-        }
-        output_dir = tmp_path / "outputs"
 
-        run_case(case_dir, config, output_dir)
+class TestWarpCommand:
+    """Fast mocked tests for `hisalign warp`."""
 
-        gallery_path = output_dir / "gallery.html"
-        assert not gallery_path.exists()
-        mock_create_html_gallery.assert_not_called()
+    @patch("hisalign.cli.HisAlignModel.load")
+    def test_warp_writes_mapped_csv(self, mock_load, tmp_path):
+        model = MockModel(offset_x=5.0, offset_y=10.0)
+        mock_load.return_value = model
 
-    @patch("he2ihc_align.cli.open_slide")
-    @patch("he2ihc_align.cli.HEIHCRegistrar")
-    @patch("he2ihc_align.cli.sample_grid_patches")
-    @patch("he2ihc_align.cli.build_mapping_table")
-    @patch("he2ihc_align.cli.create_html_gallery")
-    @patch("he2ihc_align.cli.read_patch_rgb")
-    @patch("he2ihc_align.cli.discover_case")
-    def test_run_case_generates_gallery_html(
-        self,
-        mock_discover_case,
-        mock_read_patch_rgb,
-        mock_create_html_gallery,
-        mock_build_mapping_table,
-        mock_sample_grid_patches,
-        mock_he_ihc_registrar,
-        mock_open_slide,
-        tmp_path,
+        coords_path = tmp_path / "coords.csv"
+        pd.DataFrame({"x": [0, 100], "y": [0, 100]}).to_csv(coords_path, index=False)
+        output_path = tmp_path / "mapped.csv"
+
+        args = SimpleNamespace(
+            model=tmp_path / "model.pkl",
+            marker="CD3",
+            direction="he_to_ihc",
+            coords=coords_path,
+            output=output_path,
+        )
+
+        _cmd_warp(args)
+
+        assert output_path.exists()
+        df = pd.read_csv(output_path)
+        assert list(df.columns) == ["x", "y", "marker", "direction"]
+        assert df["x"].tolist() == [5.0, 105.0]
+        assert df["y"].tolist() == [10.0, 110.0]
+
+
+class TestVisualizeCommand:
+    """Fast mocked tests for `hisalign visualize`."""
+
+    @patch("hisalign.cli._generate_visualizations")
+    @patch("hisalign.cli.HisAlign")
+    @patch("hisalign.cli.HisAlignModel.load")
+    def test_visualize_reloads_model_and_generates_outputs(
+        self, mock_load, mock_hisalign_cls, mock_generate_viz, tmp_path
     ):
-        """Test that run_case generates gallery.html when viz_sample_n > 0."""
-        # Setup mocks - create directory structure: parent/case_dir/...
-        parent_dir = tmp_path / "test_case"
-        parent_dir.mkdir()
-        case_dir = parent_dir / "batch"
-        case_dir.mkdir()
-        he_path = case_dir / "test.kfb"
-        he_path.write_text("mock")
-        markers = {"CD3": case_dir / "test CD3.svs"}
-        for p in markers.values():
-            p.write_text("mock")
-        mock_discover_case.return_value = (he_path, markers)
+        model = MockModel()
+        mock_load.return_value = model
 
-        he_slide = MagicMock()
-        ihc_slide = MagicMock()
-        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
+        aligner = MagicMock()
+        aligner._registrar = MagicMock()
+        mock_hisalign_cls.return_value = aligner
 
-        registrar = MockRegistrar()
-        mock_he_ihc_registrar.return_value = registrar
+        model_path = tmp_path / "model.pkl"
+        output_dir = tmp_path / "out"
 
-        mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
+        args = SimpleNamespace(
+            model=model_path,
+            config=tmp_path / "nonexistent.yaml",
+            output_dir=output_dir,
+        )
 
-        df = pd.DataFrame({
-            "patch_id": ["test_case_0000"],
-            "slide_id": ["test_case"],
-            "marker": ["CD3"],
-            "he_x": [0],
-            "he_y": [0],
-            "he_w": [512],
-            "he_h": [512],
-            "ihc_x": [10],
-            "ihc_y": [20],
-            "ihc_w": [512],
-            "ihc_h": [512],
-            "clipped": [False],
-        })
-        mock_build_mapping_table.return_value = df
+        _cmd_visualize(args)
 
-        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
-
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 0,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 2,
-            "generate_report": False,
-        }
-        output_dir = tmp_path / "outputs"
-
-        run_case(case_dir, config, output_dir)
-
-        mock_create_html_gallery.assert_called_once()
-        call_args = mock_create_html_gallery.call_args
-        assert call_args[0][0] == output_dir / "gallery.html"
-
-    @patch("he2ihc_align.cli._generate_report")
-    @patch("he2ihc_align.cli.open_slide")
-    @patch("he2ihc_align.cli.HEIHCRegistrar")
-    @patch("he2ihc_align.cli.sample_grid_patches")
-    @patch("he2ihc_align.cli.build_mapping_table")
-    @patch("he2ihc_align.cli.create_html_gallery")
-    @patch("he2ihc_align.cli.read_patch_rgb")
-    @patch("he2ihc_align.cli.discover_case")
-    def test_run_case_generates_report_when_enabled(
-        self,
-        mock_discover_case,
-        mock_read_patch_rgb,
-        mock_create_html_gallery,
-        mock_build_mapping_table,
-        mock_sample_grid_patches,
-        mock_he_ihc_registrar,
-        mock_open_slide,
-        mock_generate_report,
-        tmp_path,
-    ):
-        """Test that run_case calls report generation when generate_report is true."""
-        parent_dir = tmp_path / "test_case"
-        parent_dir.mkdir()
-        case_dir = parent_dir / "batch"
-        case_dir.mkdir()
-        he_path = case_dir / "test.kfb"
-        he_path.write_text("mock")
-        markers = {"CD3": case_dir / "test CD3.svs"}
-        for p in markers.values():
-            p.write_text("mock")
-        mock_discover_case.return_value = (he_path, markers)
-
-        he_slide = MagicMock()
-        ihc_slide = MagicMock()
-        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
-
-        registrar = MockRegistrar()
-        mock_he_ihc_registrar.return_value = registrar
-
-        mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
-
-        df = pd.DataFrame({
-            "patch_id": ["test_case_0000"],
-            "slide_id": ["test_case"],
-            "marker": ["CD3"],
-            "he_x": [0],
-            "he_y": [0],
-            "he_w": [512],
-            "he_h": [512],
-            "ihc_x": [10],
-            "ihc_y": [20],
-            "ihc_w": [512],
-            "ihc_h": [512],
-            "clipped": [False],
-        })
-        mock_build_mapping_table.return_value = df
-
-        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
-
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 0,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 0,
-            "generate_report": True,
-        }
-        output_dir = tmp_path / "outputs"
-
-        run_case(case_dir, config, output_dir)
-
-        mock_generate_report.assert_called_once()
-
-    @patch("he2ihc_align.cli._generate_report")
-    @patch("he2ihc_align.cli.open_slide")
-    @patch("he2ihc_align.cli.HEIHCRegistrar")
-    @patch("he2ihc_align.cli.sample_grid_patches")
-    @patch("he2ihc_align.cli.build_mapping_table")
-    @patch("he2ihc_align.cli.create_html_gallery")
-    @patch("he2ihc_align.cli.read_patch_rgb")
-    @patch("he2ihc_align.cli.discover_case")
-    def test_run_case_skips_report_when_disabled(
-        self,
-        mock_discover_case,
-        mock_read_patch_rgb,
-        mock_create_html_gallery,
-        mock_build_mapping_table,
-        mock_sample_grid_patches,
-        mock_he_ihc_registrar,
-        mock_open_slide,
-        mock_generate_report,
-        tmp_path,
-    ):
-        """Test that run_case skips report generation when generate_report is false."""
-        parent_dir = tmp_path / "test_case"
-        parent_dir.mkdir()
-        case_dir = parent_dir / "batch"
-        case_dir.mkdir()
-        he_path = case_dir / "test.kfb"
-        he_path.write_text("mock")
-        markers = {"CD3": case_dir / "test CD3.svs"}
-        for p in markers.values():
-            p.write_text("mock")
-        mock_discover_case.return_value = (he_path, markers)
-
-        he_slide = MagicMock()
-        ihc_slide = MagicMock()
-        mock_open_slide.side_effect = lambda p: he_slide if p == he_path else ihc_slide
-
-        registrar = MockRegistrar()
-        mock_he_ihc_registrar.return_value = registrar
-
-        mock_sample_grid_patches.return_value = [(0, 0, 512, 512)]
-
-        df = pd.DataFrame({
-            "patch_id": ["test_case_0000"],
-            "slide_id": ["test_case"],
-            "marker": ["CD3"],
-            "he_x": [0],
-            "he_y": [0],
-            "he_w": [512],
-            "he_h": [512],
-            "ihc_x": [10],
-            "ihc_y": [20],
-            "ihc_w": [512],
-            "ihc_h": [512],
-            "clipped": [False],
-        })
-        mock_build_mapping_table.return_value = df
-
-        mock_read_patch_rgb.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
-
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 0,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 0,
-            "generate_report": False,
-        }
-        output_dir = tmp_path / "outputs"
-
-        run_case(case_dir, config, output_dir)
-
-        mock_generate_report.assert_not_called()
-
-
-class TestRunCaseReal:
-    """Slow integration tests with real slide files."""
-
-    @pytest.mark.slow
-    def test_run_case_produces_non_empty_csv(self, tmp_path):
-        """Test that run_case produces a non-empty CSV file."""
-        case_dir = TEST_DATA / "174162-1" / "174162-1-第一批"
-        config = {
-            "patch_size": 512,
-            "stride": 512,
-            "he_level": 3,
-            "registration_level": 3,
-            "max_white_ratio": 1.0,
-            "max_image_dim_px": 1024,
-            "max_non_rigid_dim_px": 2048,
-            "mapping_csv_name": "mapping.csv",
-            "viz_sample_n": 2,
-            "generate_report": True,
-        }
-        output_dir = tmp_path / "outputs"
-
-        csv_path = run_case(case_dir, config, output_dir)
-
-        assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) > 0
-        expected_cols = [
-            "patch_id",
-            "slide_id",
-            "marker",
-            "he_x",
-            "he_y",
-            "he_w",
-            "he_h",
-            "ihc_x",
-            "ihc_y",
-            "ihc_w",
-            "ihc_h",
-            "clipped",
-        ]
-        assert list(df.columns) == expected_cols
+        mock_load.assert_called_once_with(model_path)
+        mock_hisalign_cls.assert_called_once()
+        mock_generate_viz.assert_called_once()

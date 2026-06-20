@@ -1,6 +1,6 @@
 """Registration package for HE-to-IHC whole-slide image alignment."""
 
-from he2ihc_align.registration.feature_detectors import (
+from hisalign.registration.feature_detectors import (
     AkazeFD,
     BriskFD,
     FeatureDD,
@@ -8,21 +8,21 @@ from he2ihc_align.registration.feature_detectors import (
     OrbFD,
     VggFD,
 )
-from he2ihc_align.registration.feature_matcher import (
+from hisalign.registration.feature_matcher import (
     Matcher,
     MatchInfo,
     filter_matches,
     match_descriptors,
 )
-from he2ihc_align.registration.non_rigid import (
+from hisalign.registration.non_rigid import (
     NonRigidRegistrar,
     NonRigidRegistrarBase,
     NonRigidRegistrarXY,
     OpticalFlowWarper,
     SimpleElastixWarper,
 )
-from he2ihc_align.registration.registrar import HEIHCRegistrar
-from he2ihc_align.registration.warp_tools import (
+from hisalign.registration.registrar import HEIHCRegistrar
+from hisalign.registration.warp_tools import (
     calc_d,
     get_shape,
     rescale_img,

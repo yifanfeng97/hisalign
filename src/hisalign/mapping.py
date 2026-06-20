@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from he2ihc_align.registration.registrar import HEIHCRegistrar
-from he2ihc_align.slide_io.base import Slide
+from hisalign.registration.registrar import HEIHCRegistrar
+from hisalign.slide_io.base import Slide
 
 
 def build_mapping_table(

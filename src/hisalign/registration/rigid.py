@@ -73,27 +73,40 @@ class RigidRegistrar:
             return self
 
         # Match features
-        match_info12, filtered_match_info12, match_info21, filtered_match_info21 = \
+        match_info12, filtered_match_info12, match_info21, filtered_match_info21 = (
             matcher.match_images(
-                img1=self.ref_img, desc1=ref_desc, kp1_xy=ref_kp,
-                img2=self.moving_img, desc2=moving_desc, kp2_xy=moving_kp,
+                img1=self.ref_img,
+                desc1=ref_desc,
+                kp1_xy=ref_kp,
+                img2=self.moving_img,
+                desc2=moving_desc,
+                kp2_xy=moving_kp,
             )
+        )
 
         self.matched_kp_ref = filtered_match_info12.matched_kp1_xy
         self.matched_kp_moving = filtered_match_info12.matched_kp2_xy
         self.n_matches = filtered_match_info12.n_matches
 
         if self.n_matches < 3:
-            print(f"Warning: Only {self.n_matches} matches found for {self.moving_name}. Using identity transform.")
+            print(
+                f"Warning: Only {self.n_matches} matches found for {self.moving_name}. Using identity transform."
+            )
             return self
 
         # Estimate transform
         if transform_type == "euclidean":
-            tform = EuclideanTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
+            tform = EuclideanTransform.from_estimate(
+                self.matched_kp_moving, self.matched_kp_ref
+            )
         elif transform_type == "similarity":
-            tform = SimilarityTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
+            tform = SimilarityTransform.from_estimate(
+                self.matched_kp_moving, self.matched_kp_ref
+            )
         else:
-            tform = AffineTransform.from_estimate(self.matched_kp_moving, self.matched_kp_ref)
+            tform = AffineTransform.from_estimate(
+                self.matched_kp_moving, self.matched_kp_ref
+            )
 
         self.M = tform.params
 
@@ -160,8 +173,15 @@ class RigidRegistrar:
         return warp_tools.warp_img(img, M=self.M, out_shape_rc=out_shape_rc)
 
 
-def register_pair(ref_img, moving_img, ref_name="ref", moving_name="moving",
-                  feature_detector=None, matcher=None, transform_type="similarity"):
+def register_pair(
+    ref_img,
+    moving_img,
+    ref_name="ref",
+    moving_name="moving",
+    feature_detector=None,
+    matcher=None,
+    transform_type="similarity",
+):
     """Convenience function to register a pair of images.
 
     Returns
@@ -169,6 +189,12 @@ def register_pair(ref_img, moving_img, ref_name="ref", moving_name="moving",
     registrar : RigidRegistrar
         Fitted RigidRegistrar object.
     """
-    registrar = RigidRegistrar(ref_img, moving_img, ref_name=ref_name, moving_name=moving_name)
-    registrar.fit(feature_detector=feature_detector, matcher=matcher, transform_type=transform_type)
+    registrar = RigidRegistrar(
+        ref_img, moving_img, ref_name=ref_name, moving_name=moving_name
+    )
+    registrar.fit(
+        feature_detector=feature_detector,
+        matcher=matcher,
+        transform_type=transform_type,
+    )
     return registrar

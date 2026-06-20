@@ -12,11 +12,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 from skimage import color as skcolor
 
-from he2ihc_align.registration import warp_tools
-from he2ihc_align.slide_io.base import Slide
+from hisalign.registration import warp_tools
+from hisalign.slide_io.base import Slide
 
 if TYPE_CHECKING:
-    from he2ihc_align.registration import non_rigid, rigid
+    from hisalign.registration import non_rigid, rigid
 
 
 def read_patch_rgb(
@@ -224,7 +224,7 @@ def create_html_gallery(
         "<html>",
         "<head>",
         '  <meta charset="UTF-8">',
-        f'  <title>Gallery - {html.escape(slide_id)}</title>',
+        f"  <title>Gallery - {html.escape(slide_id)}</title>",
         "  <style>",
         "    body { font-family: sans-serif; margin: 20px; }",
         "    .entry { margin-bottom: 40px; }",
@@ -233,13 +233,13 @@ def create_html_gallery(
         "  </style>",
         "</head>",
         "<body>",
-        f'  <h1>Gallery - {html.escape(slide_id)}</h1>',
+        f"  <h1>Gallery - {html.escape(slide_id)}</h1>",
     ]
 
     for entry in entries:
         title = html.escape(entry["title"])
         html_parts.append('  <div class="entry">')
-        html_parts.append(f'    <h3>{title}</h3>')
+        html_parts.append(f"    <h3>{title}</h3>")
         html_parts.append(f'    <img src="{entry["data_uri"]}" alt="{title}">')
         html_parts.append("  </div>")
 
@@ -338,7 +338,7 @@ def make_rigid_overlay_figure(
     ihc_gray = _to_gray_uint8(ihc_img)
 
     # Warp IHC to HE space using rigid transform
-    from he2ihc_align.registration.rigid import RigidRegistrar
+    from hisalign.registration.rigid import RigidRegistrar
 
     rigid_reg = RigidRegistrar(
         ref_img=he_gray,
@@ -400,15 +400,12 @@ def make_deformation_field_figure(
     u = dx[y, x]
     v = dy[y, x]
 
-    magnitude = np.sqrt(u**2 + v**2)
-
     fig, ax = plt.subplots(figsize=(8, 8))
-    im = ax.imshow(magnitude, cmap="viridis", aspect="auto")
+    im = ax.imshow(np.sqrt(dx**2 + dy**2), cmap="viridis", aspect="auto")
     ax.quiver(x, y, u, v, color="white", alpha=0.7, scale=max(w, h) * 2)
     ax.set_title(title)
     ax.axis("off")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    fig.tight_layout()
     return fig
 
 
@@ -440,34 +437,28 @@ def make_marker_thumbnail_figure(
 def compute_marker_metrics(
     rigid_registrar: rigid.RigidRegistrar,
     non_rigid_registrar: non_rigid.NonRigidRegistrar,
-    he_scale: float,
-    nr_he_scale: float | None = None,
+    mpp: float,
 ) -> dict:
-    """Compute per-marker registration metrics in level-0 pixels.
+    """Compute per-marker registration metrics in the common registration canvas.
 
-    Distances are computed in the processed registration-image space and
-    then scaled to HE level-0 pixels using ``he_scale``.  The non-rigid
-    registrar may operate at a different resolution than the rigid registrar,
-    so keypoints are rescaled before being passed to the non-rigid warp.
+    Matched keypoints are already expressed in the padded common canvas because
+    both rigid and non-rigid registrars were fit on padded images.  Distances
+    are therefore computed directly in that canvas and then converted to
+    micrometers using ``mpp`` (the physical size of one common-canvas pixel).
 
     Parameters
     ----------
     rigid_registrar
         Fitted rigid registrar containing matched keypoints.
     non_rigid_registrar
-        Fitted non-rigid registrar.
-    he_scale
-        Scale factor converting rigid-registrar reference-image pixels to
-        HE level-0 pixels.
-    nr_he_scale
-        Scale factor converting non-rigid-registrar reference-image pixels to
-        HE level-0 pixels.  Defaults to ``he_scale`` when both registrars use
-        the same resolution.
+        Fitted non-rigid registrar operating on the same common canvas.
+    mpp
+        Microns per pixel of the common registration canvas.
 
     Returns dict with keys:
-    - original_displacement_px
-    - rigid_displacement_px
-    - non_rigid_displacement_px
+    - original_displacement_um
+    - rigid_displacement_um
+    - non_rigid_displacement_um
     - rtre
     - n_matches
     """
@@ -476,9 +467,9 @@ def compute_marker_metrics(
 
     if ref_kp is None or moving_kp is None or len(ref_kp) == 0:
         return {
-            "original_displacement_px": 0.0,
-            "rigid_displacement_px": 0.0,
-            "non_rigid_displacement_px": 0.0,
+            "original_displacement_um": 0.0,
+            "rigid_displacement_um": 0.0,
+            "non_rigid_displacement_um": 0.0,
             "rtre": 0.0,
             "n_matches": 0,
         }
@@ -486,47 +477,28 @@ def compute_marker_metrics(
     ref_kp = np.asarray(ref_kp, dtype=np.float64)
     moving_kp = np.asarray(moving_kp, dtype=np.float64)
 
-    # Original displacement in rigid registration-image pixels
-    original_d = np.mean(warp_tools.calc_d(ref_kp, moving_kp))
+    reg_shape_rc = rigid_registrar.ref_img.shape[0:2]
+    diagonal_px = np.sqrt(reg_shape_rc[0] ** 2 + reg_shape_rc[1] ** 2)
 
-    # Rigid displacement: warp moving keypoints to reference space
+    original_d_px = np.median(warp_tools.calc_d(ref_kp, moving_kp))
     moving_kp_rigid = rigid_registrar.warp_xy(moving_kp)
-    rigid_d = np.mean(warp_tools.calc_d(ref_kp, moving_kp_rigid))
+    rigid_d_px = np.median(warp_tools.calc_d(ref_kp, moving_kp_rigid))
+    moving_kp_nr = non_rigid_registrar.warp_xy(moving_kp)
+    nr_d_px = np.median(warp_tools.calc_d(ref_kp, moving_kp_nr))
 
-    # Non-rigid displacement: the non-rigid registrar may use a higher/lower
-    # resolution image pair.  Scale the matched keypoints to its image space
-    # before applying the warp.
-    nr_he_scale = he_scale if nr_he_scale is None else nr_he_scale
+    original_d_um = float(original_d_px * mpp)
+    rigid_d_um = float(rigid_d_px * mpp)
+    nr_d_um = float(nr_d_px * mpp)
 
-    ref_shape = np.asarray(rigid_registrar.ref_img.shape[0:2], dtype=np.float64)
-    nr_ref_shape = np.asarray(non_rigid_registrar.ref_img.shape[0:2], dtype=np.float64)
-    ref_scale = np.max(nr_ref_shape) / np.max(ref_shape)
-
-    moving_shape = np.asarray(rigid_registrar.moving_img.shape[0:2], dtype=np.float64)
-    nr_moving_shape = np.asarray(
-        getattr(non_rigid_registrar, "moving_img", np.array([])).shape[0:2]
-        if getattr(non_rigid_registrar, "moving_img", None) is not None
-        else nr_ref_shape,
-        dtype=np.float64,
+    rtre = float(
+        np.median(warp_tools.calc_d(ref_kp, moving_kp_nr)) / diagonal_px * 100.0
     )
-    moving_scale = np.max(nr_moving_shape) / np.max(moving_shape)
-
-    ref_kp_nr = ref_kp * ref_scale
-    moving_kp_nr = moving_kp * moving_scale
-    moving_kp_nr_warped = non_rigid_registrar.warp_xy(moving_kp_nr)
-    nr_d = np.mean(warp_tools.calc_d(ref_kp_nr, moving_kp_nr_warped))
-
-    # rTRE as percentage (relative to non-rigid reference image diagonal)
-    tre, _ = warp_tools.measure_error(
-        moving_kp_nr_warped, ref_kp_nr, shape_rc=non_rigid_registrar.ref_img.shape[0:2]
-    )
-    rtre = tre * 100.0
 
     return {
-        "original_displacement_px": float(original_d * he_scale),
-        "rigid_displacement_px": float(rigid_d * he_scale),
-        "non_rigid_displacement_px": float(nr_d * nr_he_scale),
-        "rtre": float(rtre),
+        "original_displacement_um": original_d_um,
+        "rigid_displacement_um": rigid_d_um,
+        "non_rigid_displacement_um": nr_d_um,
+        "rtre": rtre,
         "n_matches": int(rigid_registrar.n_matches),
     }
 
@@ -535,14 +507,20 @@ def compute_overall_metrics(marker_metrics: dict[str, dict]) -> dict:
     """Aggregate per-marker metrics into overall statistics."""
     if not marker_metrics:
         return {
-            "original_displacement_px": 0.0,
-            "rigid_displacement_px": 0.0,
-            "non_rigid_displacement_px": 0.0,
+            "original_displacement_um": 0.0,
+            "rigid_displacement_um": 0.0,
+            "non_rigid_displacement_um": 0.0,
             "rtre": 0.0,
             "n_matches": 0,
         }
 
-    keys = ["original_displacement_px", "rigid_displacement_px", "non_rigid_displacement_px", "rtre", "n_matches"]
+    keys = [
+        "original_displacement_um",
+        "rigid_displacement_um",
+        "non_rigid_displacement_um",
+        "rtre",
+        "n_matches",
+    ]
     return {k: float(np.mean([m[k] for m in marker_metrics.values()])) for k in keys}
 
 
@@ -552,6 +530,8 @@ def create_html_report(
     overall_metrics: dict,
     overlay_entries: list[dict],
     marker_rows: list[dict],
+    report_path: Path | None = None,
+    rtre_threshold: float = 5.0,
 ) -> Path:
     """Write a slide-level registration quality report as self-contained HTML.
 
@@ -562,28 +542,35 @@ def create_html_report(
     slide_id : str
         Slide/case identifier.
     overall_metrics : dict
-        Dict with keys original_displacement_px, rigid_displacement_px,
-        non_rigid_displacement_px, rtre, n_matches.
+        Dict with keys original_displacement_um, rigid_displacement_um,
+        non_rigid_displacement_um, rtre, n_matches.
     overlay_entries : list[dict]
         List of dicts with keys ``title`` and ``data_uri``.
     marker_rows : list[dict]
-        List of dicts with keys marker, original_displacement_px,
-        rigid_displacement_px, non_rigid_displacement_px, rtre, n_matches,
+        List of dicts with keys marker, original_displacement_um,
+        rigid_displacement_um, non_rigid_displacement_um, rtre, n_matches,
         thumb_uri, def_uri.
+    report_path : Path, optional
+        Output path shown in the report footer. Defaults to ``output_path``.
+    rtre_threshold : float
+        rTRE value below which is highlighted as good.
 
     Returns
     -------
     Path
         Path to the written HTML file.
     """
+    report_path = report_path or output_path
+    from datetime import datetime
+
     html_parts = [
         "<!DOCTYPE html>",
-        "<html>",
+        '<html lang="zh-CN">',
         "<head>",
         '  <meta charset="UTF-8">',
-        f'  <title>Registration Report - {html.escape(slide_id)}</title>',
+        f"  <title>配准报告 - {html.escape(slide_id)}</title>",
         "  <style>",
-        "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 2rem; background: #f7f8fa; color: #222; }",
+        "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; margin: 2rem; background: #f7f8fa; color: #222; }",
         "    h1, h2 { color: #1a1a2e; }",
         "    .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 2rem; }",
         "    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }",
@@ -600,22 +587,23 @@ def create_html_report(
         "    .slide-thumb { max-width: 220px; border-radius: 6px; border: 1px solid #e1e4e8; }",
         "    .small { font-size: 0.85rem; color: #666; }",
         "    .good { color: #2a9d3a; font-weight: 600; }",
+        "    .he-row { background: #f6fff6; }",
         "  </style>",
         "</head>",
         "<body>",
-        f'  <h1>🔬 Registration Report – {html.escape(slide_id)}</h1>',
+        f"  <h1>🔬 配准报告 – {html.escape(slide_id)}</h1>",
         "  <div class='card'>",
-        "    <h2>Overall Error Statistics</h2>",
+        "    <h2>整体误差统计</h2>",
         "    <div class='metrics'>",
-        f"      <div class='metric'><div class='value'>{overall_metrics['original_displacement_px']:.1f}</div><div class='label'>Original mean displacement (px)</div></div>",
-        f"      <div class='metric'><div class='value'>{overall_metrics['rigid_displacement_px']:.1f}</div><div class='label'>Rigid mean displacement (px)</div></div>",
-        f"      <div class='metric'><div class='value'>{overall_metrics['non_rigid_displacement_px']:.1f}</div><div class='label'>Non-rigid mean displacement (px)</div></div>",
-        f"      <div class='metric'><div class='value'>{overall_metrics['rtre']:.2f}%</div><div class='label'>Mean rTRE</div></div>",
+        f"      <div class='metric'><div class='value'>{overall_metrics['original_displacement_um']:.1f}</div><div class='label'>原始平均位移 (µm)</div></div>",
+        f"      <div class='metric'><div class='value'>{overall_metrics['rigid_displacement_um']:.1f}</div><div class='label'>刚性配准后平均位移 (µm)</div></div>",
+        f"      <div class='metric'><div class='value'>{overall_metrics['non_rigid_displacement_um']:.1f}</div><div class='label'>非刚性配准后平均位移 (µm)</div></div>",
+        f"      <div class='metric'><div class='value'>{overall_metrics['rtre']:.2f}%</div><div class='label'>平均相对目标配准误差 (rTRE)</div></div>",
         "    </div>",
-        "    <p class='small'>All distances are in level-0 pixels. Micrometer support can be added when slide metadata provides MPP.</p>",
+        "    <p class='small'>所有距离单位均为微米 (µm)。rTRE 基于共同配准画布对角线计算。</p>",
         "  </div>",
         "  <div class='card'>",
-        "    <h2>Whole-slide Overlay (Green=HE, Magenta=IHC)</h2>",
+        "    <h2>全片叠加对比（绿色=HE，品红色=IHC）</h2>",
         "    <div class='overlap-grid'>",
     ]
 
@@ -626,34 +614,48 @@ def create_html_report(
         html_parts.append(f'        <div class="caption">{title}</div>')
         html_parts.append("      </div>")
 
-    html_parts.extend([
-        "    </div>",
-        "  </div>",
-        "  <div class='card'>",
-        "    <h2>Per-marker Registration Results</h2>",
-        "    <table>",
-        "      <tr><th>Marker</th><th>Original (px)</th><th>Rigid (px)</th><th>Non-rigid (px)</th><th>rTRE</th><th>N matches</th><th>Thumbnail</th><th>Deformation</th></tr>",
-    ])
+    html_parts.extend(
+        [
+            "    </div>",
+            "  </div>",
+            "  <div class='card'>",
+            "    <h2>逐 Marker 配准结果</h2>",
+            "    <table>",
+            "      <tr><th>切片</th><th>对齐到</th><th>原始位移 (µm)</th><th>刚性后 (µm)</th><th>非刚性后 (µm)</th><th>rTRE</th><th>匹配点数</th><th>配准缩略图</th><th>形变场</th></tr>",
+            "      <tr class='he-row'><td>HE</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>参考切片</td><td>—</td></tr>",
+        ]
+    )
 
     for row in marker_rows:
-        rtre_class = "good" if row["rtre"] < 5.0 else ""
+        rtre_class = "good" if row["rtre"] < rtre_threshold else ""
         html_parts.append("      <tr>")
-        html_parts.append(f'        <td>{html.escape(row["marker"])}</td>')
-        html_parts.append(f'        <td>{row["original_displacement_px"]:.1f}</td>')
-        html_parts.append(f'        <td>{row["rigid_displacement_px"]:.1f}</td>')
-        html_parts.append(f'        <td>{row["non_rigid_displacement_px"]:.1f}</td>')
+        html_parts.append(f"        <td>{html.escape(row['marker'])}</td>")
+        html_parts.append("        <td>HE</td>")
+        html_parts.append(f"        <td>{row['original_displacement_um']:.1f}</td>")
+        html_parts.append(f"        <td>{row['rigid_displacement_um']:.1f}</td>")
+        html_parts.append(f"        <td>{row['non_rigid_displacement_um']:.1f}</td>")
         html_parts.append(f'        <td class="{rtre_class}">{row["rtre"]:.2f}%</td>')
-        html_parts.append(f'        <td>{row["n_matches"]}</td>')
-        html_parts.append(f'        <td><img class="slide-thumb" src="{row["thumb_uri"]}" alt="{html.escape(row["marker"])} thumbnail"></td>')
-        html_parts.append(f'        <td><img class="slide-thumb" src="{row["def_uri"]}" alt="{html.escape(row["marker"])} deformation field"></td>')
+        html_parts.append(f"        <td>{row['n_matches']}</td>")
+        html_parts.append(
+            f'        <td><img class="slide-thumb" src="{row["thumb_uri"]}" alt="{html.escape(row["marker"])} thumbnail"></td>'
+        )
+        html_parts.append(
+            f'        <td><img class="slide-thumb" src="{row["def_uri"]}" alt="{html.escape(row["marker"])} deformation field"></td>'
+        )
         html_parts.append("      </tr>")
 
-    html_parts.extend([
-        "    </table>",
-        "  </div>",
-        "</body>",
-        "</html>",
-    ])
+    html_parts.extend(
+        [
+            "    </table>",
+            "  </div>",
+            "  <div class='card small'>",
+            f"    <p>输出路径：{html.escape(str(report_path))}</p>",
+            f"    <p>生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>",
+            "  </div>",
+            "</body>",
+            "</html>",
+        ]
+    )
 
     output_path.write_text("\n".join(html_parts), encoding="utf-8")
     return output_path

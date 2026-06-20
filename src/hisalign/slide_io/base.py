@@ -50,7 +50,9 @@ class Slide(Protocol):
         """Slide metadata as key-value strings."""
         ...
 
-    def read_region(self, location: tuple[int, int], level: int, size: tuple[int, int]) -> np.ndarray:
+    def read_region(
+        self, location: tuple[int, int], level: int, size: tuple[int, int]
+    ) -> np.ndarray:
         """Read a region from the slide.
 
         Args:

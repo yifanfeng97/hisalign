@@ -423,8 +423,8 @@ wheels = [
 ]
 
 [[package]]
-name = "he2ihc-align"
-version = "0.1.0"
+name = "hisalign"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "kfbslide" },

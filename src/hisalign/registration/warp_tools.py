@@ -45,23 +45,29 @@ def get_padding_matrix(src_shape_rc, dst_shape_rc):
     """Get transformation matrix to pad image to dst_shape."""
     tx = (dst_shape_rc[1] - src_shape_rc[1]) / 2
     ty = (dst_shape_rc[0] - src_shape_rc[0]) / 2
-    tform = np.array([
-        [1, 0, tx],
-        [0, 1, ty],
-        [0, 0, 1],
-    ], dtype=np.float64)
+    tform = np.array(
+        [
+            [1, 0, tx],
+            [0, 1, ty],
+            [0, 0, 1],
+        ],
+        dtype=np.float64,
+    )
     return tform
 
 
 def get_corners_of_image(shape_rc):
     """Get corners of image in (row, col) order."""
     r, c = shape_rc[0], shape_rc[1]
-    corners = np.array([
-        [0, 0],
-        [0, c],
-        [r, c],
-        [r, 0],
-    ], dtype=np.float64)
+    corners = np.array(
+        [
+            [0, 0],
+            [0, c],
+            [r, c],
+            [r, 0],
+        ],
+        dtype=np.float64,
+    )
     return corners
 
 
@@ -119,8 +125,15 @@ def warp_xy(xy, M=None, bk_dxdy=None, fwd_dxdy=None):  # noqa: N803
     return warped
 
 
-def warp_xy_from_to(xy, src_M, src_bk_dxdy, dst_M, dst_bk_dxdy,  # noqa: N803
-                    src_fwd_dxdy=None, dst_fwd_dxdy=None):
+def warp_xy_from_to(
+    xy,
+    src_M,
+    src_bk_dxdy,
+    dst_M,
+    dst_bk_dxdy,  # noqa: N803
+    src_fwd_dxdy=None,
+    dst_fwd_dxdy=None,
+):
     """Warp points from src image space to dst image space.
 
     First unwarp from src (apply inverse of src transforms), then warp to dst.
@@ -147,7 +160,9 @@ def warp_xy_from_to(xy, src_M, src_bk_dxdy, dst_M, dst_bk_dxdy,  # noqa: N803
     return dst_xy
 
 
-def warp_img(img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear", bg_color=None):  # noqa: N803
+def warp_img(
+    img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear", bg_color=None
+):  # noqa: N803
     """Warp image using affine matrix and/or backwards displacement field.
 
     Parameters
@@ -183,8 +198,14 @@ def warp_img(img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear
         else:
             flags = cv2.INTER_LINEAR
         dsize = (int(out_shape_rc[1]), int(out_shape_rc[0]))
-        warped = cv2.warpAffine(img, M[0:2, :], dsize=dsize, flags=flags,
-                                borderMode=cv2.BORDER_CONSTANT, borderValue=bg_color or 0)
+        warped = cv2.warpAffine(
+            img,
+            M[0:2, :],
+            dsize=dsize,
+            flags=flags,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=bg_color or 0,
+        )
     else:
         warped = img.copy()
         if warped.shape[0:2] != tuple(out_shape_rc):
@@ -205,11 +226,23 @@ def warp_img(img, M=None, bk_dxdy=None, out_shape_rc=None, interp_method="linear
             interp = cv2.INTER_LINEAR
 
         if warped.ndim == 3:
-            warped = cv2.remap(warped, map_x, map_y, interpolation=interp,
-                               borderMode=cv2.BORDER_CONSTANT, borderValue=bg_color or 0)
+            warped = cv2.remap(
+                warped,
+                map_x,
+                map_y,
+                interpolation=interp,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=bg_color or 0,
+            )
         else:
-            warped = cv2.remap(warped, map_x, map_y, interpolation=interp,
-                               borderMode=cv2.BORDER_CONSTANT, borderValue=bg_color or 0)
+            warped = cv2.remap(
+                warped,
+                map_x,
+                map_y,
+                interpolation=interp,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=bg_color or 0,
+            )
 
     return warped
 
@@ -243,8 +276,12 @@ def get_inverse_field(bk_dxdy, n_inter=10):
         y_coords = np.clip(np.arange(h)[:, None] + fwd_dy, 0, h - 1).astype(np.float32)
 
         # Use ndimage.map_coordinates for sampling
-        sampled_dx = ndimage.map_coordinates(dx, [y_coords, x_coords], order=1, mode='constant')
-        sampled_dy = ndimage.map_coordinates(dy, [y_coords, x_coords], order=1, mode='constant')
+        sampled_dx = ndimage.map_coordinates(
+            dx, [y_coords, x_coords], order=1, mode="constant"
+        )
+        sampled_dy = ndimage.map_coordinates(
+            dy, [y_coords, x_coords], order=1, mode="constant"
+        )
 
         # Update forward displacement
         fwd_dx = -sampled_dx
@@ -253,7 +290,9 @@ def get_inverse_field(bk_dxdy, n_inter=10):
     return [fwd_dx, fwd_dy]
 
 
-def remove_invasive_displacements(bk_dxdy, M, src_shape_rc, out_shape_rc, inpaint_holes=False):  # noqa: N803
+def remove_invasive_displacements(
+    bk_dxdy, M, src_shape_rc, out_shape_rc, inpaint_holes=False
+):  # noqa: N803
     """Remove displacements that would distort image edges.
 
     Simplified version that zeros out displacements outside the affine mask.
@@ -263,10 +302,16 @@ def remove_invasive_displacements(bk_dxdy, M, src_shape_rc, out_shape_rc, inpain
 
     if M is not None:
         # Create mask of where the affine-transformed image would be
-        affine_mask = warp_img(np.full(src_shape_rc, 255, dtype=np.uint8), M,
-                               out_shape_rc=out_shape_rc, interp_method="nearest")
+        affine_mask = warp_img(
+            np.full(src_shape_rc, 255, dtype=np.uint8),
+            M,
+            out_shape_rc=out_shape_rc,
+            interp_method="nearest",
+        )
         if not np.all(out_shape_rc == bk_dxdy[0].shape):
-            affine_mask = resize_img(affine_mask, bk_dxdy[0].shape, interp_method="nearest")
+            affine_mask = resize_img(
+                affine_mask, bk_dxdy[0].shape, interp_method="nearest"
+            )
         new_dx[affine_mask == 0] = 0
         new_dy[affine_mask == 0] = 0
     else:
@@ -360,6 +405,7 @@ def smooth_dxdy(dxdy, sigma_ratio=0.005):
     dx, dy = dxdy[0], dxdy[1]
     sigma = max(dx.shape) * sigma_ratio
     from scipy.ndimage import gaussian_filter
+
     smoothed_dx = gaussian_filter(dx, sigma=sigma)
     smoothed_dy = gaussian_filter(dy, sigma=sigma)
     return [smoothed_dx, smoothed_dy]

@@ -70,7 +70,7 @@ class FeatureDD:
         detect_img = image
         for i in range(self.n_levels):
             kp_pos_xy, desc = self._detect_and_compute(detect_img, mask)
-            kp_pos_xy *= 1 / (s ** i)
+            kp_pos_xy *= 1 / (s**i)
             all_kp.append(kp_pos_xy)
             all_desc.append(desc)
             detect_img = cv2.resize(detect_img, None, fx=s, fy=s)
@@ -83,33 +83,33 @@ class FeatureDD:
 class BriskFD(FeatureDD):
     """BRISK feature detector/descriptor."""
 
-    def __init__(self):
+    def __init__(self, n_levels=1):
         brisk = cv2.BRISK_create()
-        super().__init__(kp_detector=brisk, kp_descriptor=brisk)
+        super().__init__(kp_detector=brisk, kp_descriptor=brisk, n_levels=n_levels)
 
 
 class KazeFD(FeatureDD):
     """KAZE feature detector/descriptor."""
 
-    def __init__(self):
+    def __init__(self, n_levels=1):
         kaze = cv2.KAZE_create()
-        super().__init__(kp_detector=kaze, kp_descriptor=kaze)
+        super().__init__(kp_detector=kaze, kp_descriptor=kaze, n_levels=n_levels)
 
 
 class AkazeFD(FeatureDD):
     """AKAZE feature detector/descriptor."""
 
-    def __init__(self):
+    def __init__(self, n_levels=1):
         akaze = cv2.AKAZE_create()
-        super().__init__(kp_detector=akaze, kp_descriptor=akaze)
+        super().__init__(kp_detector=akaze, kp_descriptor=akaze, n_levels=n_levels)
 
 
 class OrbFD(FeatureDD):
     """ORB feature detector/descriptor."""
 
-    def __init__(self, nfeatures=MAX_FEATURES):
+    def __init__(self, nfeatures=MAX_FEATURES, n_levels=1):
         orb = cv2.ORB_create(nfeatures=nfeatures)
-        super().__init__(kp_detector=orb, kp_descriptor=orb)
+        super().__init__(kp_detector=orb, kp_descriptor=orb, n_levels=n_levels)
 
 
 class VggFD(FeatureDD):
@@ -118,11 +118,59 @@ class VggFD(FeatureDD):
     Note: Requires opencv-contrib-python. Falls back to ORB if not available.
     """
 
-    def __init__(self):
+    def __init__(self, n_levels=1):
         orb = cv2.ORB_create(nfeatures=MAX_FEATURES)
         try:
             vgg = cv2.xfeatures2d.VGG_create()
-            super().__init__(kp_detector=orb, kp_descriptor=vgg)
+            super().__init__(kp_detector=orb, kp_descriptor=vgg, n_levels=n_levels)
         except AttributeError:
             # xfeatures2d not available, use ORB only
-            super().__init__(kp_detector=orb)
+            super().__init__(kp_detector=orb, n_levels=n_levels)
+
+
+class SiftFD(FeatureDD):
+    """SIFT feature detector/descriptor.
+
+    SIFT is available in the main opencv-python package since the patent
+    expired. Falls back to AKAZE if SIFT cannot be created.
+    """
+
+    def __init__(self, n_levels=1):
+        try:
+            sift = cv2.SIFT_create()
+            super().__init__(kp_detector=sift, kp_descriptor=sift, n_levels=n_levels)
+        except (AttributeError, cv2.error):
+            # Older/non-free OpenCV builds may not expose SIFT
+            akaze = cv2.AKAZE_create()
+            super().__init__(kp_detector=akaze, kp_descriptor=akaze, n_levels=n_levels)
+
+
+def create_feature_detector(name: str, n_levels: int = 1) -> FeatureDD:
+    """Factory for creating a feature detector by name.
+
+    Parameters
+    ----------
+    name : str
+        One of ``brisk``, ``akaze``, ``kaze``, ``orb``, ``sift``, ``vgg``.
+    n_levels : int
+        Number of detection scales (passed to multi-scale detectors).
+
+    Returns
+    -------
+    FeatureDD
+        Configured feature detector.
+    """
+    name = name.lower().strip()
+    mapping: dict[str, type[FeatureDD]] = {
+        "brisk": BriskFD,
+        "akaze": AkazeFD,
+        "kaze": KazeFD,
+        "orb": OrbFD,
+        "sift": SiftFD,
+        "vgg": VggFD,
+    }
+    if name not in mapping:
+        raise ValueError(
+            f"Unknown feature detector '{name}'. Choose from {list(mapping.keys())}."
+        )
+    return mapping[name](n_levels=n_levels)

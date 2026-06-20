@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from he2ihc_align.patching import sample_grid_patches
-from he2ihc_align.slide_io.factory import open_slide
+from hisalign.patching import sample_grid_patches
+from hisalign.slide_io.factory import open_slide
 
 TEST_DATA = Path("/home/fengyifan/disk/code/valis/test_SCCE")
 

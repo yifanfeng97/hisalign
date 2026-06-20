@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import openslide
 
-from he2ihc_align.slide_io.base import SlideIOError, _pil_to_rgb_array
+from hisalign.slide_io.base import SlideIOError, _pil_to_rgb_array
 
 
 class OpenSlideBackend:
@@ -33,19 +33,28 @@ class OpenSlideBackend:
     def properties(self) -> dict[str, str]:
         return dict(self._slide.properties)
 
-    def read_region(self, location: tuple[int, int], level: int, size: tuple[int, int]) -> np.ndarray:
+    def read_region(
+        self, location: tuple[int, int], level: int, size: tuple[int, int]
+    ) -> np.ndarray:
         """Return HWC uint8 RGB numpy array.
 
         ``location`` is in level-0 pixel coordinates (same as OpenSlide).
         ``size`` is in target-level pixel coordinates.
         """
         if level < 0 or level >= self.level_count:
-            raise SlideIOError(f"Invalid level {level}: must be between 0 and {self.level_count - 1}")
+            raise SlideIOError(
+                f"Invalid level {level}: must be between 0 and {self.level_count - 1}"
+            )
         x, y = location
         w, h = size
         downsample = self.level_downsamples[level]
         level0_w, level0_h = self.level_dimensions[0]
-        if x < 0 or y < 0 or x + w * downsample > level0_w + downsample or y + h * downsample > level0_h + downsample:
+        if (
+            x < 0
+            or y < 0
+            or x + w * downsample > level0_w + downsample
+            or y + h * downsample > level0_h + downsample
+        ):
             raise SlideIOError(
                 f"Region out of bounds: location {location}, size {size}, level {level} "
                 f"exceeds level-0 dimensions {self.level_dimensions[0]}"

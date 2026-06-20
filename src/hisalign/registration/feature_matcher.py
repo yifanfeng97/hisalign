@@ -24,7 +24,7 @@ RANSAC_DICT = {
 }
 DEFAULT_RANSAC = 7
 DEFAULT_MATCH_FILTER = USAC_MAGSAC_NAME
-DEFAULT_FD = feature_detectors.BriskFD
+DEFAULT_FD = feature_detectors.KazeFD
 
 AMBIGUOUS_METRICS = set(metrics.pairwise._VALID_METRICS).intersection(
     metrics.pairwise.PAIRWISE_KERNEL_FUNCTIONS.keys()
@@ -41,7 +41,9 @@ def convert_similarity_to_distance(s, n_features=64):
     return -np.log(s + EPS) / (1 / n_features)
 
 
-def filter_matches_ransac(kp1_xy, kp2_xy, ransac_val=DEFAULT_RANSAC, method=USAC_MAGSAC_NAME):
+def filter_matches_ransac(
+    kp1_xy, kp2_xy, ransac_val=DEFAULT_RANSAC, method=USAC_MAGSAC_NAME
+):
     """Remove poor matches using RANSAC."""
     method_num = RANSAC_DICT[method]
     if kp1_xy.shape[0] >= 4:
@@ -86,17 +88,25 @@ def filter_matches(kp1_xy, kp2_xy, method=DEFAULT_MATCH_FILTER, filtering_kwargs
             kp1_xy, kp2_xy, **filtering_kwargs
         )
     else:
-        filtered_src, filtered_dst, good_idx = kp1_xy.copy(), kp2_xy.copy(), np.arange(len(kp1_xy))
+        filtered_src, filtered_dst, good_idx = (
+            kp1_xy.copy(),
+            kp2_xy.copy(),
+            np.arange(len(kp1_xy)),
+        )
 
     # Additional Tukey filtering
-    filtered_src, filtered_dst, good_idx = filter_matches_tukey(filtered_src, filtered_dst)
+    filtered_src, filtered_dst, good_idx = filter_matches_tukey(
+        filtered_src, filtered_dst
+    )
     return filtered_src, filtered_dst, good_idx
 
 
 class MatchInfo:
     """Stores match results between two images."""
 
-    def __init__(self, matched_kp1_xy, matched_kp2_xy, distances, similarities, n_matches):
+    def __init__(
+        self, matched_kp1_xy, matched_kp2_xy, distances, similarities, n_matches
+    ):
         self.matched_kp1_xy = matched_kp1_xy
         self.matched_kp2_xy = matched_kp2_xy
         self.distances = distances
@@ -110,9 +120,17 @@ class MatchInfo:
         self.dst_name = dst_name
 
 
-def match_descriptors(descriptors1, descriptors2, metric=None, metric_type=None,
-                      p=2, max_distance=np.inf, cross_check=True, max_ratio=1.0,
-                      metric_kwargs=None):
+def match_descriptors(
+    descriptors1,
+    descriptors2,
+    metric=None,
+    metric_type=None,
+    p=2,
+    max_distance=np.inf,
+    cross_check=True,
+    max_ratio=1.0,
+    metric_kwargs=None,
+):
     """Brute-force matching of descriptors using sklearn."""
     if metric_kwargs is None:
         metric_kwargs = {}
@@ -122,23 +140,31 @@ def match_descriptors(descriptors1, descriptors2, metric=None, metric_type=None,
 
     if metric is None:
         if np.issubdtype(descriptors1.dtype, np.bool_):
-            metric = 'hamming'
+            metric = "hamming"
         else:
-            metric = 'euclidean'
+            metric = "euclidean"
 
-    if metric == 'minkowski':
-        metric_kwargs['p'] = p
+    if metric == "minkowski":
+        metric_kwargs["p"] = p
 
     if callable(metric) or metric in metrics.pairwise._VALID_METRICS:
-        distances = metrics.pairwise_distances(descriptors1, descriptors2, metric=metric, **metric_kwargs)
+        distances = metrics.pairwise_distances(
+            descriptors1, descriptors2, metric=metric, **metric_kwargs
+        )
         if callable(metric) and metric_type is None:
             metric_type = "distance"
         if metric_type == "similarity":
-            distances = convert_similarity_to_distance(distances, n_features=descriptors1.shape[1])
+            distances = convert_similarity_to_distance(
+                distances, n_features=descriptors1.shape[1]
+            )
 
     if metric in metrics.pairwise.PAIRWISE_KERNEL_FUNCTIONS:
-        similarities = pairwise_kernels(descriptors1, descriptors2, metric=metric, **metric_kwargs)
-        distances = convert_similarity_to_distance(similarities, n_features=descriptors1.shape[1])
+        similarities = pairwise_kernels(
+            descriptors1, descriptors2, metric=metric, **metric_kwargs
+        )
+        distances = convert_similarity_to_distance(
+            similarities, n_features=descriptors1.shape[1]
+        )
 
     indices1 = np.arange(descriptors1.shape[0])
     indices2 = np.argmin(distances, axis=1)
@@ -164,14 +190,33 @@ def match_descriptors(descriptors1, descriptors2, metric=None, metric_type=None,
         mask = ratio < max_ratio
         indices1 = indices1[mask]
         indices2 = indices2[mask]
-        return np.column_stack((indices1, indices2)), best_distances[mask], metric, metric_type
+        return (
+            np.column_stack((indices1, indices2)),
+            best_distances[mask],
+            metric,
+            metric_type,
+        )
 
-    return np.column_stack((indices1, indices2)), distances[indices1, indices2], metric, metric_type
+    return (
+        np.column_stack((indices1, indices2)),
+        distances[indices1, indices2],
+        metric,
+        metric_type,
+    )
 
 
-def match_desc_and_kp(desc1, kp1_xy, desc2, kp2_xy, metric=None,
-                      metric_type=None, metric_kwargs=None, max_ratio=1.0,
-                      filter_method=DEFAULT_MATCH_FILTER, filtering_kwargs=None):
+def match_desc_and_kp(
+    desc1,
+    kp1_xy,
+    desc2,
+    kp2_xy,
+    metric=None,
+    metric_type=None,
+    metric_kwargs=None,
+    max_ratio=1.0,
+    filter_method=DEFAULT_MATCH_FILTER,
+    filtering_kwargs=None,
+):
     """Match descriptors and keypoints, then filter outliers."""
     if filtering_kwargs is None:
         filtering_kwargs = {}
@@ -179,8 +224,13 @@ def match_desc_and_kp(desc1, kp1_xy, desc2, kp2_xy, metric=None,
     cross_check = filter_method.upper() in RANSAC_DICT.keys()
 
     matches, match_distances, metric_name, metric_type = match_descriptors(
-        desc1, desc2, metric=metric, metric_type=metric_type,
-        metric_kwargs=metric_kwargs, max_ratio=max_ratio, cross_check=cross_check
+        desc1,
+        desc2,
+        metric=metric,
+        metric_type=metric_type,
+        metric_kwargs=metric_kwargs,
+        max_ratio=max_ratio,
+        cross_check=cross_check,
     )
 
     desc1_match_idx = matches[:, 0]
@@ -194,29 +244,46 @@ def match_desc_and_kp(desc1, kp1_xy, desc2, kp2_xy, metric=None,
         matched_kp1_xy=matched_kp1_xy,
         matched_kp2_xy=matched_kp2_xy,
         distances=match_distances,
-        similarities=convert_distance_to_similarity(match_distances, n_features=desc1.shape[1]),
+        similarities=convert_distance_to_similarity(
+            match_distances, n_features=desc1.shape[1]
+        ),
         n_matches=n_matches,
     )
     match_info21 = MatchInfo(
         matched_kp1_xy=matched_kp2_xy,
         matched_kp2_xy=matched_kp1_xy,
         distances=match_distances,
-        similarities=convert_distance_to_similarity(match_distances, n_features=desc1.shape[1]),
+        similarities=convert_distance_to_similarity(
+            match_distances, n_features=desc1.shape[1]
+        ),
         n_matches=n_matches,
     )
 
     # Filter matches
     if n_matches > 0 and filter_method.upper() in RANSAC_DICT.keys():
         filtered_kp1, filtered_kp2, good_idx = filter_matches(
-            matched_kp1_xy, matched_kp2_xy, method=filter_method, filtering_kwargs=filtering_kwargs
+            matched_kp1_xy,
+            matched_kp2_xy,
+            method=filter_method,
+            filtering_kwargs=filtering_kwargs,
         )
-        filtered_distances = match_distances[good_idx] if len(good_idx) > 0 else np.array([])
-        filtered_similarities = convert_distance_to_similarity(filtered_distances, n_features=desc1.shape[1]) if len(filtered_distances) > 0 else np.array([])
+        filtered_distances = (
+            match_distances[good_idx] if len(good_idx) > 0 else np.array([])
+        )
+        filtered_similarities = (
+            convert_distance_to_similarity(
+                filtered_distances, n_features=desc1.shape[1]
+            )
+            if len(filtered_distances) > 0
+            else np.array([])
+        )
     else:
         filtered_kp1 = matched_kp1_xy
         filtered_kp2 = matched_kp2_xy
         filtered_distances = match_distances
-        filtered_similarities = convert_distance_to_similarity(match_distances, n_features=desc1.shape[1])
+        filtered_similarities = convert_distance_to_similarity(
+            match_distances, n_features=desc1.shape[1]
+        )
 
     n_filtered = len(filtered_kp1)
     filtered_match_info12 = MatchInfo(
@@ -240,23 +307,45 @@ def match_desc_and_kp(desc1, kp1_xy, desc2, kp2_xy, metric=None,
 class Matcher:
     """Base matcher class."""
 
-    def __init__(self, feature_detector=None, match_filter_method=DEFAULT_MATCH_FILTER):
+    def __init__(
+        self,
+        feature_detector=None,
+        match_filter_method=DEFAULT_MATCH_FILTER,
+        max_ratio: float = 1.0,
+    ):
         if feature_detector is None:
             feature_detector = DEFAULT_FD()
         self.feature_detector = feature_detector
         self.match_filter_method = match_filter_method
+        self.max_ratio = max_ratio
 
-    def match_images(self, img1, desc1, kp1_xy, img2, desc2, kp2_xy,
-                     additional_filtering_kwargs=None, sorting_images=False):
+    def match_images(
+        self,
+        img1,
+        desc1,
+        kp1_xy,
+        img2,
+        desc2,
+        kp2_xy,
+        additional_filtering_kwargs=None,
+        sorting_images=False,
+    ):
         """Match features between two images."""
         if additional_filtering_kwargs is None:
             additional_filtering_kwargs = {}
 
-        filtering_kwargs = {"ransac_val": DEFAULT_RANSAC, "method": self.match_filter_method}
+        filtering_kwargs = {
+            "ransac_val": DEFAULT_RANSAC,
+            "method": self.match_filter_method,
+        }
         filtering_kwargs.update(additional_filtering_kwargs)
 
         return match_desc_and_kp(
-            desc1, kp1_xy, desc2, kp2_xy,
+            desc1,
+            kp1_xy,
+            desc2,
+            kp2_xy,
             filter_method=self.match_filter_method,
             filtering_kwargs=filtering_kwargs,
+            max_ratio=self.max_ratio,
         )
