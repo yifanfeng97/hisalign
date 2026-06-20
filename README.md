@@ -142,13 +142,41 @@ hisalign visualize \
 
 ## 🖼️ 也能玩普通图片 / Works with plain images too
 
-如果只是想用两张 `.jpg`/`.png` 做快速实验，见 `examples/register_jpg.py`：
+仓库里自带了一对从真实 WSI 导出的缩略图（`examples/images/he.jpg` 与 `examples/images/ihc.jpg`），可以直接跑：
+
+```bash
+python examples/register_jpg.py --output-dir ./out
+```
+
+如果想用合成数据做最小可复现实验：
 
 ```bash
 python examples/register_jpg.py --synthetic --output-dir ./out
 ```
 
-For a minimal example using plain `.jpg`/`.png` images instead of whole-slide formats, run:
+或者用你自己的 `.jpg`/`.png`：
+
+```bash
+python examples/register_jpg.py \
+  --he path/to/he.jpg \
+  --ihc path/to/ihc.jpg \
+  --output-dir ./out
+```
+
+The repo includes whole-slide thumbnail exports of an H&E slide and a CD3
+IHC slide (`examples/images/he.jpg` and `examples/images/ihc.jpg`) for a quick demo:
+
+```bash
+python examples/register_jpg.py --output-dir ./out
+```
+
+For synthetic data:
+
+```bash
+python examples/register_jpg.py --synthetic --output-dir ./out
+```
+
+Or provide your own images:
 
 ```bash
 python examples/register_jpg.py --he he.jpg --ihc ihc.jpg --output-dir ./out

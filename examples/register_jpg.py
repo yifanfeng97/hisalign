@@ -4,12 +4,20 @@ This example shows how to use ``HisAlign`` with ordinary raster images instead
 of whole-slide formats. Because a JPG/PNG has only one resolution level, set
 ``registration_level=0`` and provide an explicit ``mpp`` value.
 
+Usage with the bundled real example images
+------------------------------------------
+
+The repository includes whole-slide thumbnail exports of an H&E slide and a
+CD3 IHC slide (``examples/images/``). To register them::
+
+    python examples/register_jpg.py --output-dir ./out
+
 Usage with your own images
 --------------------------
 
     python examples/register_jpg.py \
-        --he examples/data/he.jpg \
-        --ihc examples/data/ihc.jpg \
+        --he path/to/he.jpg \
+        --ihc path/to/ihc.jpg \
         --output-dir ./out
 
 Run on synthetic data
@@ -21,7 +29,7 @@ Outputs
 -------
 
 - ``out/model.pkl``            -- serializable HisAlignModel
-- ``out/he.jpg`` / ``ihc.jpg`` -- input images (when --synthetic)
+- ``out/he.jpg`` / ``ihc.jpg`` -- input images (only when --synthetic)
 - ``out/00_unregistered.png``  -- green/magenta overlay before registration
 - ``out/01_rigid.png``         -- overlay after rigid registration
 - ``out/02_nonrigid.png``      -- overlay after non-rigid registration
@@ -135,10 +143,22 @@ def main() -> None:
     if args.synthetic:
         he_path, ihc_path = _generate_synthetic_images(args.output_dir)
     else:
-        if not args.he or not args.ihc:
-            parser.error("--he and --ihc are required unless using --synthetic")
         he_path = args.he
         ihc_path = args.ihc
+
+        # Fall back to bundled example images if no paths are given
+        if not he_path or not ihc_path:
+            bundled_dir = Path(__file__).resolve().parent / "images"
+            bundled_he = bundled_dir / "he.jpg"
+            bundled_ihc = bundled_dir / "ihc.jpg"
+            if bundled_he.exists() and bundled_ihc.exists():
+                he_path = bundled_he
+                ihc_path = bundled_ihc
+            else:
+                parser.error(
+                    "--he and --ihc are required when bundled example images are missing "
+                    "(use --synthetic to generate synthetic data)"
+                )
 
     marker = ihc_path.stem.split()[-1] if ihc_path.stem else "IHC"
 
@@ -182,10 +202,10 @@ def main() -> None:
         args.output_dir / "02_nonrigid.png",
     )
 
-    # Quick offline coordinate mapping sanity check
-    coords = np.array([[50.0, 50.0]])
+    # Quick offline coordinate mapping sanity check (image center)
+    coords = np.array([[512.0, 512.0]])
     mapped = model.warp_xy(coords, marker=marker, direction="he_to_ihc")
-    print(f"Sample warp HE -> IHC: {coords[0]} -> {mapped[0]}")
+    print(f"Sample warp HE -> IHC (center): {coords[0]} -> {mapped[0]}")
 
     print(f"Done. Outputs in {args.output_dir}")
 
