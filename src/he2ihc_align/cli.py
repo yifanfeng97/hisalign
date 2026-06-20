@@ -237,7 +237,7 @@ def _generate_report(
             rigid_registrar=rigid_reg,
             non_rigid_registrar=nr_reg,
             he_scale=registrar.he_scale_to_level0,
-            ihc_scale=registrar.ihc_scale_to_level0[marker],
+            nr_he_scale=max(he_slide.level_dimensions[0]) / max(nr_reg.ref_img.shape[:2]),
         )
 
         marker_rows.append(

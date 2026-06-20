@@ -104,24 +104,38 @@ class MockRigidRegistrar:
 
     def __init__(self, ref_kp, moving_kp, m=None, n_matches=None):
         self.ref_img = np.zeros((100, 100), dtype=np.uint8)
+        self.moving_img = np.zeros((100, 100), dtype=np.uint8)
         self.matched_kp_ref = np.asarray(ref_kp, dtype=np.float64) if ref_kp is not None else None
         self.matched_kp_moving = np.asarray(moving_kp, dtype=np.float64) if moving_kp is not None else None
         self.M = m if m is not None else np.eye(3)
         self.n_matches = n_matches if n_matches is not None else (len(ref_kp) if ref_kp is not None else 0)
 
     def inverse_warp_xy(self, xy):
-        # Identity transform for simplicity
+        # Not used in metrics; identity for completeness
         return np.asarray(xy, dtype=np.float64)
+
+    def warp_xy(self, xy):
+        # Translate moving points by -1 in x to align with ref
+        xy = np.asarray(xy, dtype=np.float64)
+        return xy - np.array([1.0, 0.0])
 
 
 class MockNonRigidRegistrar:
     """Minimal mock for compute_marker_metrics tests."""
 
-    def __init__(self):
+    def __init__(self, warp_offset: float = 1.0):
+        self.ref_img = np.zeros((100, 100), dtype=np.uint8)
+        self.moving_img = np.zeros((100, 100), dtype=np.uint8)
         self.bk_dxdy = [np.zeros((100, 100)), np.zeros((100, 100))]
+        self.warp_offset = warp_offset
 
     def inverse_warp_xy(self, xy):
         return np.asarray(xy, dtype=np.float64)
+
+    def warp_xy(self, xy):
+        # Translate moving points by -warp_offset in x to align with ref
+        xy = np.asarray(xy, dtype=np.float64)
+        return xy - np.array([self.warp_offset, 0.0])
 
 
 class TestComputeMarkerMetrics:
@@ -130,7 +144,7 @@ class TestComputeMarkerMetrics:
     def test_zero_when_no_matches(self):
         rigid_reg = MockRigidRegistrar(None, None)
         nr_reg = MockNonRigidRegistrar()
-        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=1.0, ihc_scale=1.0)
+        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=1.0)
         assert metrics["original_displacement_px"] == 0.0
         assert metrics["rigid_displacement_px"] == 0.0
         assert metrics["non_rigid_displacement_px"] == 0.0
@@ -141,7 +155,7 @@ class TestComputeMarkerMetrics:
         moving_kp = np.array([[1, 0], [11, 0], [1, 10]], dtype=np.float64)
         rigid_reg = MockRigidRegistrar(ref_kp, moving_kp)
         nr_reg = MockNonRigidRegistrar()
-        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=1.0, ihc_scale=1.0)
+        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=1.0)
         assert metrics["original_displacement_px"] == pytest.approx(1.0)
         # Identity transform means rigid/non-rigid perfectly align ref kp with itself
         assert metrics["rigid_displacement_px"] == pytest.approx(0.0)
@@ -150,12 +164,32 @@ class TestComputeMarkerMetrics:
 
     def test_scales_to_level0(self):
         ref_kp = np.array([[0, 0], [10, 0]], dtype=np.float64)
-        moving_kp = np.array([[0, 0], [10, 0]], dtype=np.float64)
+        moving_kp = np.array([[1, 0], [11, 0]], dtype=np.float64)
         rigid_reg = MockRigidRegistrar(ref_kp, moving_kp)
         nr_reg = MockNonRigidRegistrar()
-        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=2.0, ihc_scale=2.0)
-        assert metrics["original_displacement_px"] == 0.0
-        assert metrics["rigid_displacement_px"] == 0.0
+        metrics = viz.compute_marker_metrics(rigid_reg, nr_reg, he_scale=2.0)
+        assert metrics["original_displacement_px"] == pytest.approx(2.0)
+        assert metrics["rigid_displacement_px"] == pytest.approx(0.0)
+
+    def test_scales_keypoints_to_nr_resolution(self):
+        """Keypoints should be scaled to the non-rigid registrar's image space."""
+        ref_kp = np.array([[0, 0], [10, 0]], dtype=np.float64)
+        moving_kp = np.array([[1, 0], [11, 0]], dtype=np.float64)
+        rigid_reg = MockRigidRegistrar(ref_kp, moving_kp)
+
+        # Non-rigid registrar at 2x resolution with a warp offset of 2 px
+        nr_reg = MockNonRigidRegistrar(warp_offset=2.0)
+        nr_reg.ref_img = np.zeros((200, 200), dtype=np.uint8)
+        nr_reg.moving_img = np.zeros((200, 200), dtype=np.uint8)
+
+        metrics = viz.compute_marker_metrics(
+            rigid_reg, nr_reg, he_scale=2.0, nr_he_scale=1.0
+        )
+        # Rigid removes the 1-px original offset; scaled keypoints + 2-px nr warp
+        # should align the non-rigid result as well.
+        assert metrics["non_rigid_displacement_px"] == pytest.approx(0.0)
+        assert metrics["original_displacement_px"] == pytest.approx(2.0)
+        assert metrics["rigid_displacement_px"] == pytest.approx(0.0)
 
 
 class TestComputeOverallMetrics:

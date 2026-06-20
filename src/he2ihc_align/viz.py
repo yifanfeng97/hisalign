@@ -441,9 +441,28 @@ def compute_marker_metrics(
     rigid_registrar: rigid.RigidRegistrar,
     non_rigid_registrar: non_rigid.NonRigidRegistrar,
     he_scale: float,
-    ihc_scale: float,
+    nr_he_scale: float | None = None,
 ) -> dict:
     """Compute per-marker registration metrics in level-0 pixels.
+
+    Distances are computed in the processed registration-image space and
+    then scaled to HE level-0 pixels using ``he_scale``.  The non-rigid
+    registrar may operate at a different resolution than the rigid registrar,
+    so keypoints are rescaled before being passed to the non-rigid warp.
+
+    Parameters
+    ----------
+    rigid_registrar
+        Fitted rigid registrar containing matched keypoints.
+    non_rigid_registrar
+        Fitted non-rigid registrar.
+    he_scale
+        Scale factor converting rigid-registrar reference-image pixels to
+        HE level-0 pixels.
+    nr_he_scale
+        Scale factor converting non-rigid-registrar reference-image pixels to
+        HE level-0 pixels.  Defaults to ``he_scale`` when both registrars use
+        the same resolution.
 
     Returns dict with keys:
     - original_displacement_px
@@ -467,29 +486,46 @@ def compute_marker_metrics(
     ref_kp = np.asarray(ref_kp, dtype=np.float64)
     moving_kp = np.asarray(moving_kp, dtype=np.float64)
 
-    # Original displacement in level-0 pixels
-    ref_kp_level0 = ref_kp * he_scale
-    moving_kp_level0 = moving_kp * ihc_scale
-    original_d = np.mean(warp_tools.calc_d(ref_kp_level0, moving_kp_level0))
+    # Original displacement in rigid registration-image pixels
+    original_d = np.mean(warp_tools.calc_d(ref_kp, moving_kp))
 
-    # Rigid displacement: warp HE keypoints to IHC space via inverse rigid
-    moving_kp_rigid = rigid_registrar.inverse_warp_xy(ref_kp)
-    moving_kp_rigid_level0 = moving_kp_rigid * ihc_scale
-    rigid_d = np.mean(warp_tools.calc_d(ref_kp_level0, moving_kp_rigid_level0))
+    # Rigid displacement: warp moving keypoints to reference space
+    moving_kp_rigid = rigid_registrar.warp_xy(moving_kp)
+    rigid_d = np.mean(warp_tools.calc_d(ref_kp, moving_kp_rigid))
 
-    # Non-rigid displacement: warp HE keypoints to IHC space via full inverse warp
-    moving_kp_nr = non_rigid_registrar.inverse_warp_xy(ref_kp)
-    moving_kp_nr_level0 = moving_kp_nr * ihc_scale
-    nr_d = np.mean(warp_tools.calc_d(ref_kp_level0, moving_kp_nr_level0))
+    # Non-rigid displacement: the non-rigid registrar may use a higher/lower
+    # resolution image pair.  Scale the matched keypoints to its image space
+    # before applying the warp.
+    nr_he_scale = he_scale if nr_he_scale is None else nr_he_scale
 
-    # rTRE as percentage (relative to image diagonal)
-    tre, _ = warp_tools.measure_error(moving_kp_nr, ref_kp, shape_rc=rigid_registrar.ref_img.shape[0:2])
+    ref_shape = np.asarray(rigid_registrar.ref_img.shape[0:2], dtype=np.float64)
+    nr_ref_shape = np.asarray(non_rigid_registrar.ref_img.shape[0:2], dtype=np.float64)
+    ref_scale = np.max(nr_ref_shape) / np.max(ref_shape)
+
+    moving_shape = np.asarray(rigid_registrar.moving_img.shape[0:2], dtype=np.float64)
+    nr_moving_shape = np.asarray(
+        getattr(non_rigid_registrar, "moving_img", np.array([])).shape[0:2]
+        if getattr(non_rigid_registrar, "moving_img", None) is not None
+        else nr_ref_shape,
+        dtype=np.float64,
+    )
+    moving_scale = np.max(nr_moving_shape) / np.max(moving_shape)
+
+    ref_kp_nr = ref_kp * ref_scale
+    moving_kp_nr = moving_kp * moving_scale
+    moving_kp_nr_warped = non_rigid_registrar.warp_xy(moving_kp_nr)
+    nr_d = np.mean(warp_tools.calc_d(ref_kp_nr, moving_kp_nr_warped))
+
+    # rTRE as percentage (relative to non-rigid reference image diagonal)
+    tre, _ = warp_tools.measure_error(
+        moving_kp_nr_warped, ref_kp_nr, shape_rc=non_rigid_registrar.ref_img.shape[0:2]
+    )
     rtre = tre * 100.0
 
     return {
-        "original_displacement_px": float(original_d),
-        "rigid_displacement_px": float(rigid_d),
-        "non_rigid_displacement_px": float(nr_d),
+        "original_displacement_px": float(original_d * he_scale),
+        "rigid_displacement_px": float(rigid_d * he_scale),
+        "non_rigid_displacement_px": float(nr_d * nr_he_scale),
         "rtre": float(rtre),
         "n_matches": int(rigid_registrar.n_matches),
     }

@@ -150,15 +150,22 @@ class HEIHCRegistrar:
                 )
                 ihc_nr_gray = _to_grayscale(ihc_nr)
 
-                # Scale rigid transform to new resolution
-                scale_factor = max(he_nr_gray.shape) / max(self.he_gray.shape)
+                # Scale rigid transform to new resolution.
+                # The transform maps moving image coordinates to reference image
+                # coordinates.  When both images are upsampled, the linear part
+                # only needs to account for the difference in upsampling ratios,
+                # while the translation (in reference pixels) scales with the
+                # reference upsampling factor.
+                ref_scale_factor = max(he_nr_gray.shape) / max(self.he_gray.shape)
+                moving_scale_factor = max(ihc_nr_gray.shape) / max(self.ihc_grays[marker].shape)
                 m_scaled = rigid_reg.M.copy()
-                m_scaled[0, 0] *= scale_factor
-                m_scaled[0, 1] *= scale_factor
-                m_scaled[1, 0] *= scale_factor
-                m_scaled[1, 1] *= scale_factor
-                m_scaled[0, 2] *= scale_factor
-                m_scaled[1, 2] *= scale_factor
+                scale_ratio = ref_scale_factor / moving_scale_factor
+                m_scaled[0, 0] *= scale_ratio
+                m_scaled[0, 1] *= scale_ratio
+                m_scaled[1, 0] *= scale_ratio
+                m_scaled[1, 1] *= scale_ratio
+                m_scaled[0, 2] *= ref_scale_factor
+                m_scaled[1, 2] *= ref_scale_factor
             else:
                 he_nr_gray = self.he_gray
                 ihc_nr_gray = ihc_gray
