@@ -16,10 +16,23 @@ patch_size: 512
 stride: 512
 he_level: 0
 max_white_ratio: 0.95
-viz_sample_n: 5
+viz_sample_n: 8              # number of patches in gallery, 0 to disable
+viz_global_thumb_max_dim_px: 512  # longest side of the global location thumbnail
 viz_random_seed: 42
 viz_sample_clipped: true
 
+# Image compression and sizing for the unified report
+viz_image_format: "jpeg"      # png | jpeg — base format for most figures
+viz_image_quality: 85         # JPEG quality (0-100), ignored for PNG
+viz_overlay_dpi: 80           # DPI for unregistered/rigid/non-rigid overlays
+viz_thumb_dpi: 80             # DPI for per-marker HE/IHC thumbnails
+viz_deformation_dpi: 60       # DPI for deformation field plots
+viz_patch_dpi: 80             # DPI for patch gallery figures
+viz_patch_image_format: "jpeg"  # format specifically for patch gallery
+viz_patch_image_quality: 85     # JPEG quality for patch gallery
+viz_patch_max_px: 512         # local patches are resized to this longest side before plotting
+viz_patch_col_inches: 2.5     # width per marker column in patch gallery figures
+
 # Slide-level report
-generate_report: true
+generate_report: false       # whether to generate viz_report.html
 report_rtre_threshold: 5.0

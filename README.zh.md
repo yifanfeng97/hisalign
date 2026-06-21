@@ -1,25 +1,39 @@
+<div align="center">
+
+<img src="docs/assets/banner.svg" alt="HISAlign banner" width="720">
+
+<br/>
+<br/>
+
+**H&E 与多重 IHC marker 全切片图像配准**
+
+**将每张 IHC marker 切片配准到 H&E 参考切片空间，并输出可离线使用的 `.pkl` 配准模型。**
+
+[English](./README.md) · [简体中文](./README.zh.md)
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yifanfeng97/hisalign/main/docs/assets/banner.svg" width="720" alt="HISAlign banner">
+  <a href="https://python.org">
+    <img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=1a1a2e" alt="Python 3.11+">
+  </a>
+  <a href="https://pypi.org/project/hisalign/">
+    <img src="https://img.shields.io/badge/version-0.2.0-orange?style=for-the-badge&labelColor=1a1a2e" alt="Version 0.2.0">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-06b6d4?style=for-the-badge&labelColor=1a1a2e" alt="MIT License">
+  </a>
 </p>
 
-<h1 align="center">🔬 HISAlign</h1>
+<br/>
 
-<p align="center">
-  <b>H&E 与多重 IHC marker 全切片图像配准</b>
-</p>
+> **"Align once. Map everywhere."**  
+> *"一次配准，处处映射"*
 
-<p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square" alt="Python 3.11+"></a>
-  <a href="#"><img src="https://img.shields.io/badge/version-0.2.0-orange?style=flat-square" alt="Version 0.2.0"></a>
-  <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License"></a>
-  <span> · </span>
-  <a href="README.md">English</a>
-</p>
+<br/>
 
----
+<img src="docs/assets/hero.png" alt="HISAlign registration before/after" width="800" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 
-> 💡 **一句话介绍**  
-> HISAlign 将每张 IHC marker 切片配准到 H&E 参考切片空间，并输出一个可离线使用的 `.pkl` 配准模型。
+<br/>
+</div>
 
 ---
 
@@ -30,7 +44,7 @@
 | 同一组织切了 H&E 和多张 IHC，空间位置对不上 | 刚性 + 光流非刚性配准，逐 marker 对齐到 H&E |
 | 配准结果依赖打开的切片句柄，难以复用 | 只保存 numpy 数组与变换参数，完全可序列化 |
 | 下游分析需要把 HE 上的 ROI 坐标转到 IHC | 离线 `warp_xy` 接口，输入 level-0 坐标即可 |
-| 需要快速评估配准质量 | 自动生成 patch 级 gallery 与 slide 级 report |
+| 需要快速评估配准质量 | 可选的 unified `viz_report.html`，包含 slide 摘要与 patch gallery |
 
 ---
 
@@ -45,7 +59,7 @@ flowchart LR
     NR["光流非刚性\n配准"]
     MODEL["model.pkl\n可序列化模型"]
     WARP["warp_xy\n离线坐标映射"]
-    VIZ["gallery.html\nreport.html"]
+    VIZ["viz_report.html"]
 
     HE --> PRE
     IHC --> PRE
@@ -60,8 +74,16 @@ flowchart LR
 
 ## 🚀 安装
 
+使用 `uv` 从 PyPI 安装：
+
 ```bash
-uv sync && uv pip install -e .
+uv tool install hisalign
+```
+
+或者作为库安装到当前环境：
+
+```bash
+uv pip install hisalign
 ```
 
 验证入口：
@@ -117,6 +139,7 @@ hisalign register \
 ```
 
 > 可省略 `marker=`，marker 名会从文件名的最后一段自动提取。
+> `hisalign register` 默认只输出 `model.pkl`；在配置中设置 `generate_report: true` 即可额外生成 `viz_report.html`。
 
 **2. 基于模型做坐标映射**
 
@@ -131,7 +154,7 @@ hisalign warp \
 
 输入 `coords.csv` 需要包含 `x`、`y` 两列；输出会额外包含 `marker`、`direction` 列。
 
-**3. 生成可视化报告**
+**3. 从已有模型生成可视化报告**
 
 ```bash
 hisalign visualize \
@@ -140,7 +163,9 @@ hisalign visualize \
   --config configs/default.yaml
 ```
 
-`register` 命令也会根据配置自动生成 `gallery.html` 和 `report.html`。
+> **默认行为：** `hisalign register` 默认只输出 `model.pkl`。在配置中设置 `generate_report: true`（或修改 `configs/default.yaml`），即可同时生成统一的 `viz_report.html`。
+
+`register` 命令也会根据配置自动生成 `viz_report.html`。
 
 ---
 
@@ -197,8 +222,9 @@ python examples/register_jpg.py \
 
 如果开启可视化，还会在同目录生成：
 
-- `gallery.html` — **patch 级别**随机采样可视化，对比 HE patch 与其对应的各 marker IHC patch。
-- `report.html` — **slide 级别**配准质量报告，含叠加图、rTRE 统计、每个 marker 的缩略图与形变场。
+- `viz_report.html` — **统一的网页可视化报告**：一个自包含 HTML 文件，包含两个标签页。"Slide Summary" 标签页展示叠加对比图、rTRE 统计、每个 marker 的缩略图与形变场；"Patch Gallery" 标签页展示采样 patch 的全局定位与局部 HE/IHC patch 对比。报告内图片采用 JPEG 压缩并针对网页展示缩放，文件体积通常只有数 MB，便于打开和分享。
+
+> **提示：** 默认的 `configs/default.yaml` 中 `generate_report: false`。将其设为 `true` 后，`hisalign register` 会直接生成 `viz_report.html`，无需再单独运行 `hisalign visualize`。
 
 ---
 
@@ -216,9 +242,20 @@ match_max_ratio: 1.0           # Lowe ratio test，1.0 关闭
 mpp: null                      # level-0 像素尺寸（µm/px），缺失时显式设置
 
 # 可视化
-viz_sample_n: 5                # gallery 采样 patch 数，0 不生成
-generate_report: true          # 是否生成 report.html
-report_rtre_threshold: 5.0     # rTRE 良好阈值
+viz_sample_n: 8              # gallery 采样 patch 数，0 不生成
+viz_global_thumb_max_dim_px: 512  # 全局定位缩略图的最大边长
+viz_image_format: "jpeg"      # png | jpeg — 多数图的基础格式
+viz_image_quality: 85         # JPEG 质量（0-100），PNG 时忽略
+viz_overlay_dpi: 80           # 叠加图 DPI
+viz_thumb_dpi: 80             # 每 marker 缩略图 DPI
+viz_deformation_dpi: 60       # 形变场 DPI
+viz_patch_dpi: 80             # patch gallery 图 DPI
+viz_patch_image_format: "jpeg"  # patch gallery 专用格式
+viz_patch_image_quality: 85     # patch gallery JPEG 质量
+viz_patch_max_px: 512         # 局部 patch 绘图前缩放到该最长边
+viz_patch_col_inches: 2.5     # patch gallery 每 marker 列宽度（英寸）
+generate_report: false        # 是否生成 viz_report.html
+report_rtre_threshold: 5.0    # rTRE 良好阈值
 ```
 
 ---

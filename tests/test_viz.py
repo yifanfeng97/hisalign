@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from matplotlib import pyplot as plt
 
 from hisalign import viz
 
@@ -90,6 +91,47 @@ class TestDeformationFieldFigure:
         dx = np.zeros((32, 32))
         dy = np.zeros((32, 32))
         fig = viz.make_deformation_field_figure([dx, dy], "field")
+        assert fig is not None
+
+
+class TestPatchWithContextFigure:
+    """Tests for combined global + local patch figure."""
+
+    def test_creates_figure(self):
+        he_global = np.random.randint(0, 255, (128, 256, 3), dtype=np.uint8)
+        ihc_global = {"CD3": np.random.randint(0, 255, (128, 256, 3), dtype=np.uint8)}
+        he_patch = np.zeros((64, 64, 3), dtype=np.uint8)
+        ihc_patches = {"CD3": np.zeros((64, 64, 3), dtype=np.uint8)}
+        fig = viz.make_patch_with_context_figure(
+            he_global_thumb=he_global,
+            he_downsample=32.0,
+            he_bbox_xywh=(1000, 2000, 512, 512),
+            ihc_global_thumbs=ihc_global,
+            ihc_downsamples={"CD3": 32.0},
+            ihc_bboxes_xywh={"CD3": (1100, 2100, 512, 512)},
+            he_patch=he_patch,
+            ihc_patches=ihc_patches,
+            title="test context",
+        )
+        assert fig is not None
+
+    def test_clipped_flag_adds_badge(self):
+        he_global = np.random.randint(0, 255, (128, 256, 3), dtype=np.uint8)
+        ihc_global = {"CD3": np.random.randint(0, 255, (128, 256, 3), dtype=np.uint8)}
+        he_patch = np.zeros((64, 64, 3), dtype=np.uint8)
+        ihc_patches = {"CD3": np.zeros((64, 64, 3), dtype=np.uint8)}
+        fig = viz.make_patch_with_context_figure(
+            he_global_thumb=he_global,
+            he_downsample=1.0,
+            he_bbox_xywh=(0, 0, 64, 64),
+            ihc_global_thumbs=ihc_global,
+            ihc_downsamples={"CD3": 1.0},
+            ihc_bboxes_xywh={"CD3": (0, 0, 64, 64)},
+            he_patch=he_patch,
+            ihc_patches=ihc_patches,
+            title="test clipped",
+            clipped_flags={"CD3": True},
+        )
         assert fig is not None
 
 
@@ -215,11 +257,29 @@ class TestComputeOverallMetrics:
         assert overall["n_matches"] == 15
 
 
+class TestFigToDataUri:
+    """Tests for configurable figure encoding."""
+
+    def test_png_default(self):
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, 1])
+        uri = viz.fig_to_data_uri(fig)
+        assert uri.startswith("data:image/png;base64,")
+
+    def test_jpeg_with_quality(self):
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, 1])
+        uri = viz.fig_to_data_uri(fig, fmt="jpeg", dpi=80, quality=75)
+        assert uri.startswith("data:image/jpeg;base64,")
+        # JPEG output should be non-empty base64
+        assert len(uri.split(",")[1]) > 0
+
+
 class TestCreateHtmlReport:
     """Tests for create_html_report."""
 
     def test_writes_html(self, tmp_path):
-        output_path = tmp_path / "report.html"
+        output_path = tmp_path / "viz_report.html"
         overall_metrics = {
             "original_displacement_um": 100.0,
             "rigid_displacement_um": 50.0,
@@ -236,12 +296,18 @@ class TestCreateHtmlReport:
                 "non_rigid_displacement_um": 25.0,
                 "rtre": 3.5,
                 "n_matches": 100,
-                "thumb_uri": "data:image/png;base64,thumb",
+                "he_thumb_uri": "data:image/png;base64,he_thumb",
+                "ihc_thumb_uri": "data:image/png;base64,ihc_thumb",
                 "def_uri": "data:image/png;base64,def",
             }
         ]
         result = viz.create_html_report(
-            output_path, "test_case", overall_metrics, overlay_entries, marker_rows
+            output_path,
+            "test_case",
+            overall_metrics,
+            overlay_entries,
+            marker_rows,
+            he_ref_thumb_uri="data:image/png;base64,ref",
         )
         assert result.exists()
         content = result.read_text(encoding="utf-8")
@@ -251,3 +317,70 @@ class TestCreateHtmlReport:
         assert "全片叠加对比" in content
         assert "对齐到" in content
         assert "HE" in content
+        assert "HE 缩略图" in content
+        assert "Registered IHC 缩略图" in content
+
+    def test_unified_report_has_tabs_and_gallery(self, tmp_path):
+        output_path = tmp_path / "viz_report.html"
+        overall_metrics = {
+            "original_displacement_um": 10.0,
+            "rigid_displacement_um": 5.0,
+            "non_rigid_displacement_um": 2.0,
+            "rtre": 1.2,
+            "n_matches": 10,
+        }
+        overlay_entries = [{"title": "Rigid", "data_uri": "data:image/png;base64,abc"}]
+        marker_rows = [
+            {
+                "marker": "CD3",
+                "original_displacement_um": 10.0,
+                "rigid_displacement_um": 5.0,
+                "non_rigid_displacement_um": 2.0,
+                "rtre": 1.2,
+                "n_matches": 10,
+                "he_thumb_uri": "data:image/png;base64,he",
+                "ihc_thumb_uri": "data:image/png;base64,ihc",
+                "def_uri": "data:image/png;base64,def",
+            }
+        ]
+        gallery_entries = [
+            {"title": "patch 1", "data_uri": "data:image/png;base64,p1"}
+        ]
+        result = viz.create_html_report(
+            output_path,
+            "unified",
+            overall_metrics,
+            overlay_entries,
+            marker_rows,
+            he_ref_thumb_uri="data:image/png;base64,ref",
+            gallery_entries=gallery_entries,
+        )
+        content = result.read_text(encoding="utf-8")
+        assert "Slide Summary" in content
+        assert "Patch Gallery (1)" in content
+        assert 'loading="lazy"' in content
+        assert "panel-slide" in content
+        assert "panel-gallery" in content
+        assert "patch 1" in content
+
+    def test_unified_report_empty_gallery(self, tmp_path):
+        output_path = tmp_path / "viz_report.html"
+        overall_metrics = {
+            "original_displacement_um": 0.0,
+            "rigid_displacement_um": 0.0,
+            "non_rigid_displacement_um": 0.0,
+            "rtre": 0.0,
+            "n_matches": 0,
+        }
+        result = viz.create_html_report(
+            output_path,
+            "empty",
+            overall_metrics,
+            overlay_entries=[],
+            marker_rows=[],
+            he_ref_thumb_uri="",
+            gallery_entries=[],
+        )
+        content = result.read_text(encoding="utf-8")
+        assert "Patch Gallery (0)" in content
+        assert "panel-gallery" in content
