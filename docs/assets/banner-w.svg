@@ -17,7 +17,7 @@
     </filter>
   </defs>
 
-  <rect width="800" height="200" fill="none" stroke="none"/>
+  <rect width="800" height="200" fill="#ffffff" rx="12" stroke="#f1f5f9" stroke-width="1.5"/>
   
   <g transform="translate(60, 50)" filter="url(#soft-shadow)">
     <path d="M 50,10 
