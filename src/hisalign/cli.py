@@ -132,7 +132,9 @@ def _generate_visualizations(
             logger.info("Sampled %d patches for gallery", len(he_patch_bboxes))
 
             patch_max_px = config.get("viz_patch_max_px", 384)
-            patch_fmt = config.get("viz_patch_image_format", config.get("viz_image_format", "png"))
+            patch_fmt = config.get(
+                "viz_patch_image_format", config.get("viz_image_format", "png")
+            )
             patch_dpi = config.get("viz_patch_dpi", 100)
             patch_quality = config.get(
                 "viz_patch_image_quality", config.get("viz_image_quality", 85)
@@ -165,9 +167,7 @@ def _generate_visualizations(
 
                 for idx in sample_indices:
                     he_x, he_y, he_w, he_h = he_patch_bboxes[idx]
-                    he_patch = read_patch_rgb(
-                        he_slide, he_x, he_y, he_w, he_h, level=0
-                    )
+                    he_patch = read_patch_rgb(he_slide, he_x, he_y, he_w, he_h, level=0)
                     he_patch = _downsample_for_web(he_patch, max_px=patch_max_px)
 
                     ihc_patches: dict[str, np.ndarray] = {}

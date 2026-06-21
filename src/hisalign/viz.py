@@ -210,7 +210,11 @@ def fig_to_data_uri(
     buf.seek(0)
     data = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
-    mime = "image/jpeg" if fmt == "jpeg" else ("image/webp" if fmt == "webp" else "image/png")
+    mime = (
+        "image/jpeg"
+        if fmt == "jpeg"
+        else ("image/webp" if fmt == "webp" else "image/png")
+    )
     return f"data:{mime};base64,{data}"
 
 
@@ -900,7 +904,9 @@ def create_html_report(
                 html_parts.append("        </div>")
             html_parts.append("      </div>")
         else:
-            html_parts.append("      <p class='small'>未采样 patch（viz_sample_n 为 0 或无可视化 patch）。</p>")
+            html_parts.append(
+                "      <p class='small'>未采样 patch（viz_sample_n 为 0 或无可视化 patch）。</p>"
+            )
         html_parts.append("    </div>")
         html_parts.append("  </div>")
         html_parts.extend(

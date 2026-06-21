@@ -3,7 +3,6 @@
 <img src="docs/assets/banner.svg" alt="HISAlign banner" width="720">
 
 <br/>
-<br/>
 
 **Whole-slide image alignment for H&E and multiplex IHC markers**
 

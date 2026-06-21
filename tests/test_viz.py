@@ -343,9 +343,7 @@ class TestCreateHtmlReport:
                 "def_uri": "data:image/png;base64,def",
             }
         ]
-        gallery_entries = [
-            {"title": "patch 1", "data_uri": "data:image/png;base64,p1"}
-        ]
+        gallery_entries = [{"title": "patch 1", "data_uri": "data:image/png;base64,p1"}]
         result = viz.create_html_report(
             output_path,
             "unified",

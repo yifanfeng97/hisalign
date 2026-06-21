@@ -50,9 +50,7 @@ class ImageSlideBackend:
         Requests are clamped to the image bounds.
         """
         if level != 0:
-            raise SlideIOError(
-                f"ImageSlideBackend only supports level 0, got {level}"
-            )
+            raise SlideIOError(f"ImageSlideBackend only supports level 0, got {level}")
 
         x, y = location
         w, h = size
