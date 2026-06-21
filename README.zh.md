@@ -4,8 +4,6 @@
 
 **H&E 与多重 IHC marker 全切片图像配准**
 
-**将每张 IHC marker 切片配准到 H&E 参考切片空间，并输出可离线使用的 `.pkl` 配准模型。**
-
 [English](./README.md) · [简体中文](./README.zh.md)
 
 <p align="center">

@@ -4,8 +4,6 @@
 
 **Whole-slide image alignment for H&E and multiplex IHC markers**
 
-**Register each IHC marker slide into the H&E reference space and get a standalone `.pkl` alignment model for offline coordinate mapping.**
-
 [English](./README.md) · [简体中文](./README.zh.md)
 
 <p align="center">
